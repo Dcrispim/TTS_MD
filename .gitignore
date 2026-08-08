@@ -1,0 +1,23 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+tmp/
+.DS_Store
+config.yaml
+
+# Modelos TTS: centenas de MB baixados das releases upstream, nao versionados.
+# Veja o README para onde baixar e config.example.yaml para apontar o caminho.
+models/
+
+# Audio gerado
+output/
+*.wav
+*.mp3
+*.ogg
+*.opus
+*.flac
+*.m4a
+*.m3u
