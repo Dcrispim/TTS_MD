@@ -33,6 +33,7 @@ tts-md examples/sample.md
 tts-md examples/sample.md --output livro.mp3
 tts-md examples/sample.md --lang pt-BR
 tts-md examples/sample.md --play
+tts-md examples/sample.md --speed 1.5
 tts-md examples/sample.md --stream
 tts-md examples/sample.md --stream --output ~/audios/livro
 tts-md examples/sample.md --stream --play
@@ -45,6 +46,9 @@ tts-md --text="Chame Payment.approve() antes" --play
 ```
 
 Saída padrão: `output/<nome>.wav`
+
+`--speed` multiplica a velocidade de todas as vozes (ex.: `1.5` para 50% mais rápido, `0.8`
+para mais lento). Vale para o modo padrão e para `--stream`; precisa ser maior que zero.
 
 ## Opção `--text`
 

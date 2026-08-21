@@ -163,13 +163,15 @@ class TTSEngine:
         self,
         blocks: list[SpeechBlock],
         tmp_dir: Path,
+        *,
+        speed: float = 1.0,
     ) -> list[Path]:
         tmp_dir.mkdir(parents=True, exist_ok=True)
         wav_files: list[Path] = []
 
         for index, block in enumerate(blocks, start=1):
             out_path = tmp_dir / f"{index:03d}.wav"
-            generated = self.router.synthesize(block, out_path)
+            generated = self.router.synthesize(block, out_path, speed=speed)
             wav_files.append(generated)
 
             if block.pause_after > 0:
@@ -184,6 +186,8 @@ class TTSEngine:
         blocks: list[SpeechBlock],
         tmp_dir: Path,
         index: int,
+        *,
+        speed: float = 1.0,
     ) -> list[Path]:
         """Sintetiza os blocos de uma unica linha do Markdown."""
         parts: list[Path] = []
@@ -191,7 +195,7 @@ class TTSEngine:
 
         for position, block in enumerate(blocks):
             out_path = tmp_dir / f"{index:04d}_{position:02d}.wav"
-            parts.append(self.router.synthesize(block, out_path))
+            parts.append(self.router.synthesize(block, out_path, speed=speed))
 
             # Silencio no fim da faixa nao serve: quem pausa entre linhas e o player.
             if block.pause_after > 0 and position != last:
@@ -209,6 +213,7 @@ class TTSEngine:
         default_lang: str | None = None,
         keep_temp: bool = False,
         tmp_dir: Path | None = None,
+        speed: float = 1.0,
     ) -> Iterator[StreamTrack]:
         """Gera um audio por linha do Markdown, entregando cada faixa assim que fica pronta.
 
@@ -235,7 +240,7 @@ class TTSEngine:
                 title = " ".join(block.text for block in group)
                 final_path = out_dir / f"{track_name(index, title, width=width)}.wav"
 
-                parts = self._synthesize_group(group, work_tmp, index)
+                parts = self._synthesize_group(group, work_tmp, index, speed=speed)
                 staged = work_tmp / f"line_{index:0{width}d}.wav"
                 if len(parts) == 1:
                     normalize_sample_rate(parts[0], staged, TARGET_SAMPLE_RATE)
@@ -266,6 +271,7 @@ class TTSEngine:
         play: bool = False,
         keep_temp: bool = False,
         tmp_dir: Path | None = None,
+        speed: float = 1.0,
     ) -> Path:
         """Sintetiza o Markdown ja lido (veja read_markdown) num arquivo unico."""
         blocks = self.parse_markdown(text, default_lang=default_lang)
@@ -274,7 +280,7 @@ class TTSEngine:
             raise ValueError("No speakable content found after parsing.")
 
         work_tmp = tmp_dir or work_dir(text_label(text))
-        wav_files = self.synthesize_blocks(blocks, work_tmp)
+        wav_files = self.synthesize_blocks(blocks, work_tmp, speed=speed)
 
         output.parent.mkdir(parents=True, exist_ok=True)
         # Os intermediarios normalizados ficam no work dir, nao no destino final.

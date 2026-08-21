@@ -42,13 +42,15 @@ class TTSRouter:
             speed=block.speed or voice_cfg.speed,
         )
 
-    def synthesize(self, block: SpeechBlock, out_path: Path) -> Path:
+    def synthesize(
+        self, block: SpeechBlock, out_path: Path, *, speed: float = 1.0
+    ) -> Path:
         voice_cfg = self.resolve_voice(block)
         engine = self.get_engine(voice_cfg.engine)
         return engine.generate(
             block.text,
             voice_cfg,
             out_path,
-            speed=block.speed,
+            speed=block.speed * speed,
             lang=block.lang,
         )

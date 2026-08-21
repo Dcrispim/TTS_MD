@@ -34,6 +34,7 @@ def _run_stream(
     play: bool,
     keep_temp: bool,
     tmp_dir: Path,
+    speed: float,
 ) -> None:
     if out_dir.suffix.lower() in AUDIO_SUFFIXES:
         raise click.ClickException(
@@ -57,6 +58,7 @@ def _run_stream(
             default_lang=lang,
             keep_temp=keep_temp,
             tmp_dir=tmp_dir,
+            speed=speed,
         ):
             count += 1
             click.echo(f"{track.path.name}  [{track.lang}] {track.text}")
@@ -159,6 +161,12 @@ def _output_stem(input_file: Path | None, inline_text: str | None) -> str:
 )
 @click.option("--play", is_flag=True, help="Play the generated audio.")
 @click.option(
+    "--speed",
+    type=float,
+    default=1.0,
+    help="Global speed multiplier applied to every voice (e.g. 1.5 for 50% faster).",
+)
+@click.option(
     "--stream",
     is_flag=True,
     help=(
@@ -237,6 +245,7 @@ def main(
     output: Path | None,
     lang: str | None,
     play: bool,
+    speed: float,
     stream: bool,
     temp: bool,
     debug_parser: bool,
@@ -275,6 +284,8 @@ def main(
             "--temp writes to a scratch directory under the system temp dir, "
             "so --output would be ignored. Drop one of the two."
         )
+    if speed <= 0:
+        raise click.ClickException("--speed must be greater than 0.")
 
     cfg_path = config_path or _default_config_path()
     if not cfg_path.exists():
@@ -323,6 +334,7 @@ def main(
             play=play,
             keep_temp=keep_temp,
             tmp_dir=work_tmp,
+            speed=speed,
         )
         if keep_temp:
             click.echo(f"Work dir: {work_tmp}")
@@ -336,6 +348,7 @@ def main(
         play=play,
         keep_temp=keep_temp,
         tmp_dir=work_tmp,
+        speed=speed,
     )
     click.echo(f"Generated: {final}")
     if keep_temp:
