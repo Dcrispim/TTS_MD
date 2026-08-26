@@ -6,57 +6,275 @@
 # Idiomas aceitos: pt, en (ou pt-BR, en-US). Termos sao case-insensitive.
 '@icv': en
 API: pt
-Account: en
+Account:
+  lang: pt
+  text: acáunt
+Atlassian: en
+Cypress:
+  lang: pt
+  text: sáiprés
 DTO:
   lang: pt
   text: dê tê ó
-IncentPay: en
-adapter: en
-alias: en
-approve: en
-arquivo: pt
-assert: en
-awards: en
-baseline: en
-branch: en
-commit: en
-configuração: pt
-controller: en
-deploy: en
-dev:
+HQ:
+  lang: pt
+  text: agá cu
+IncentPay:
+  lang: pt
+  text: incent pei
+Jest:
+  lang: pt
+  text: djérst
+MCP:
+  lang: pt
+  text: eme cê pê
+PR:
   lang: en
-  text: development
-development: en
-endpoint: en
-errors: en
-gateway: en
+  text: pull request
+PostHog:
+  lang: pt
+  text: pôst róg
+StarkBank:
+  lang: pt
+  text: estárk bénk
+adapter:
+  lang: pt
+  text: adápter
+alias:
+  lang: pt
+  text: êlias
+approve:
+  lang: pt
+  text: apruve
+arquivo: pt
+assert:
+  lang: pt
+  text: assért
+awards:
+  lang: pt
+  text: auórdz
+baseline:
+  lang: pt
+  text: béisláin
+block:
+  lang: pt
+  text: blóc
+blockedAt:
+  lang: pt
+  text: blóqued át
+blockedMessage:
+  lang: pt
+  text: blóqued méssidj
+branch:
+  lang: pt
+  text: brantch
+bug:
+  lang: pt
+  text: bágui
+bugs:
+  lang: pt
+  text: bágues
+buy:
+  lang: pt
+  text: bái
+cache:
+  lang: pt
+  text: quéch
+caching:
+  lang: pt
+  text: quéchin
+checkout:
+  lang: pt
+  text: tchécaut
+commit:
+  lang: pt
+  text: comít
+commits:
+  lang: pt
+  text: comíts
+configuração: pt
+consults:
+  lang: pt
+  text: consálts
+controller:
+  lang: pt
+  text: contrôler
+core:
+  lang: pt
+  text: côr
+createInput:
+  lang: pt
+  text: criêit ínput
+dedupe:
+  lang: pt
+  text: didúpe
+deploy:
+  lang: pt
+  text: diplói
+dev:
+  lang: pt
+  text: divélopment
+development:
+  lang: pt
+  text: divélopment
+dict:
+  lang: pt
+  text: dícti
+email:
+  lang: pt
+  text: imêiu
+endpoint:
+  lang: pt
+  text: êndpoint
+errorCode:
+  lang: pt
+  text: érrorcôud
+errors:
+  lang: pt
+  text: érrors
+gap:
+  lang: pt
+  text: gáp
+gateway:
+  lang: pt
+  text: guêituei
 grpc:
   lang: pt
   text: gê érre pê cê
-handler: en
-headquarter: en
-import: en
-leader: en
-leaderboard: en
-leaderboards: en
-lint: en
-message: en
-metadata: en
+handler:
+  lang: pt
+  text: randler
+hash:
+  lang: pt
+  text: réch
+headquarter:
+  lang: pt
+  text: redcuórter
+hook:
+  lang: pt
+  text: ruc
+identify:
+  lang: pt
+  text: aidentifái
+import:
+  lang: pt
+  text: impórt
+input:
+  lang: pt
+  text: ínput
+issue: en
+job:
+  lang: pt
+  text: djób
+leader:
+  lang: pt
+  text: líder
+leaderboard:
+  lang: pt
+  text: líderbord
+leaderboards:
+  lang: pt
+  text: líderbords
+lint:
+  lang: pt
+  text: lint
+log:
+  lang: pt
+  text: lóg
+message:
+  lang: pt
+  text: méssidj
+metadata:
+  lang: pt
+  text: métadeita
+multiprocessing: en
+multithread: en
+networkhub:
+  lang: pt
+  text: nétuorc rab
+now:
+  lang: pt
+  text: náu
 npm:
   lang: pt
   text: ene pê eme
-origin: en
-payload: en
-payment: en
-paymentBatch: en
-paymentBatches: en
-payments: en
-payout: en
-payouts: en
-platform: en
-product: en
-rollback: en
+nullable:
+  lang: pt
+  text: nálabol
+origin:
+  lang: pt
+  text: óridjin
+payload:
+  lang: pt
+  text: pêilôud
+payment:
+  lang: pt
+  text: pêiment
+paymentBatch:
+  lang: pt
+  text: pêiment bátch
+paymentBatches:
+  lang: pt
+  text: pêiment bátchis
+payments:
+  lang: pt
+  text: pêiments
+payout:
+  lang: pt
+  text: pêiaut
+payouts:
+  lang: pt
+  text: pêiauts
+platform:
+  lang: pt
+  text: plátform
+product:
+  lang: pt
+  text: pródact
+role:
+  lang: pt
+  text: rôul
+rollback:
+  lang: pt
+  text: rôlbác
+swagger:
+  lang: pt
+  text: suáguer
+ticket:
+  lang: pt
+  text: tíquet
+tier:
+  lang: pt
+  text: tíer
+tracking:
+  lang: pt
+  text: tráquin
+typecheck:
+  lang: pt
+  text: táipetchéc
+ui:
+  lang: pt
+  text: u ai
+undefined:
+  lang: pt
+  text: andifáind
+user:
+  lang: pt
+  text: iúzer
 usuário: pt
-worker: en
-workspace: en
-worktree: en
+uuid:
+  lang: pt
+  text: u u ai dê
+wake word: en
+wizard:
+  lang: pt
+  text: uízerd
+worker:
+  lang: pt
+  text: uôrker
+workspace:
+  lang: pt
+  text: uôrkspeis
+worktree:
+  lang: pt
+  text: uôrktri

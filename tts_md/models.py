@@ -88,6 +88,13 @@ class AppConfig:
     voices: dict[str, VoiceConfig] = field(default_factory=dict)
 
     @classmethod
+    def default_path(cls) -> Path:
+        local = Path("config.yaml")
+        if local.exists():
+            return local
+        return Path(__file__).resolve().parent.parent / "config.example.yaml"
+
+    @classmethod
     def load(cls, path: Path) -> AppConfig:
         with path.open(encoding="utf-8") as f:
             data = yaml.safe_load(f)

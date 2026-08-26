@@ -72,13 +72,6 @@ def _run_stream(
     click.echo(f"Playlist: {out_dir / 'playlist.m3u'}")
 
 
-def _default_config_path() -> Path:
-    local = Path("config.yaml")
-    if local.exists():
-        return local
-    return Path(__file__).resolve().parent.parent / "config.example.yaml"
-
-
 def _manage_index(
     specs: tuple[str, ...],
     wanted: tuple[str, ...],
@@ -287,7 +280,7 @@ def main(
     if speed <= 0:
         raise click.ClickException("--speed must be greater than 0.")
 
-    cfg_path = config_path or _default_config_path()
+    cfg_path = config_path or AppConfig.default_path()
     if not cfg_path.exists():
         raise click.ClickException(
             f"Config not found: {cfg_path}. Copy config.example.yaml to config.yaml."
