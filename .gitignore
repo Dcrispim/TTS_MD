@@ -7,6 +7,9 @@ build/
 tmp/
 .DS_Store
 config.yaml
+callbacks.yaml
+*.log
+*.pid
 
 # Modelos TTS: centenas de MB baixados das releases upstream, nao versionados.
 # Veja o README para onde baixar e config.example.yaml para apontar o caminho.
