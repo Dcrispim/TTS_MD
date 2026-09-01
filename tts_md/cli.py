@@ -7,6 +7,7 @@ from pathlib import Path
 
 import click
 
+from tts_md import client
 from tts_md.audio.player import QueuedPlayer, find_player
 from tts_md.audio.playlist import slugify
 from tts_md.engine import TTSEngine, text_label, work_dir
@@ -20,6 +21,7 @@ from tts_md.lang_index import (
     parse_spec,
 )
 from tts_md.models import AppConfig
+from tts_md.server import DEFAULT_PORT, ServeOptions, run_server
 
 
 AUDIO_SUFFIXES = {".wav", ".mp3", ".ogg", ".flac", ".m4a"}
@@ -122,6 +124,21 @@ def _output_stem(input_file: Path | None, inline_text: str | None) -> str:
     if input_file is not None:
         return input_file.stem
     return slugify(inline_text or "") or "text"
+
+
+def _validate_execution_flags(*, temp: bool, play: bool, output: Path | None) -> None:
+    """Regras de --temp, compartilhadas pelo modo local e pela inicializacao
+    do --serve (as duas execucoes decidem sozinhas como lidar com os arquivos)."""
+    if temp and not play:
+        raise click.ClickException(
+            "--temp only makes sense with --play: without playback the audio "
+            "would be left in a scratch directory you never listen to."
+        )
+    if temp and output is not None:
+        raise click.ClickException(
+            "--temp writes to a scratch directory under the system temp dir, "
+            "so --output would be ignored. Drop one of the two."
+        )
 
 
 @click.command()
@@ -232,6 +249,45 @@ def _output_stem(input_file: Path | None, inline_text: str | None) -> str:
     is_flag=True,
     help="Print the language index and exit.",
 )
+@click.option(
+    "--serve",
+    is_flag=True,
+    help=(
+        "Listen on the network as a remote speaker instead of reading a "
+        "Markdown input: every request received is handled with the "
+        "--play/--stream/--temp/--output/--keep-temp flags given here. "
+        "Blocks until Ctrl+C."
+    ),
+)
+@click.option(
+    "--host",
+    default=None,
+    envvar="TTS_MD_HOST",
+    help=(
+        "With --serve, the interface to bind (default 0.0.0.0). Without "
+        "--serve, the address of a tts-md --serve to send this run to "
+        "instead of speaking locally. Also settable via TTS_MD_HOST, so "
+        "every tts-md run on a machine can default to a server without "
+        "repeating the flag."
+    ),
+)
+@click.option(
+    "--port",
+    type=int,
+    default=DEFAULT_PORT,
+    show_default=True,
+    envvar="TTS_MD_PORT",
+    help="Port to bind (--serve) or to reach (--host). Also settable via TTS_MD_PORT.",
+)
+@click.option(
+    "--check",
+    is_flag=True,
+    envvar="TTS_MD_CHECK",
+    help=(
+        "With --host, probe the server first and fall back to local "
+        "synthesis if it does not respond. Also settable via TTS_MD_CHECK."
+    ),
+)
 def main(
     input_file: Path | None,
     inline_text: str | None,
@@ -249,6 +305,10 @@ def main(
     replace: bool,
     exist_terms: tuple[str, ...],
     list_terms: bool,
+    serve: bool,
+    host: str | None,
+    port: int,
+    check: bool,
 ) -> None:
     """Convert Markdown to speech using modular parsers and offline TTS."""
     if replace and not add_terms:
@@ -259,6 +319,30 @@ def main(
         )
         return
 
+    if serve:
+        if input_file is not None or inline_text is not None:
+            raise click.ClickException(
+                "--serve doesn't take a Markdown input; it only listens for requests."
+            )
+        _validate_execution_flags(temp=temp, play=play, output=output)
+
+        cfg_path = config_path or AppConfig.default_path()
+        if not cfg_path.exists():
+            raise click.ClickException(
+                f"Config not found: {cfg_path}. Copy config.example.yaml to config.yaml."
+            )
+        config = AppConfig.load(cfg_path)
+        if not skip_validation:
+            if not shutil.which("ffmpeg"):
+                raise click.ClickException("ffmpeg is required but was not found in PATH.")
+            config.validate()
+
+        opts = ServeOptions(
+            play=play, stream=stream, temp=temp, output=output, keep_temp=keep_temp
+        )
+        run_server(config, opts, host or "0.0.0.0", port)
+        return
+
     if input_file is not None and inline_text is not None:
         raise click.ClickException(
             "Pass either a Markdown file or --text, not both."
@@ -267,18 +351,48 @@ def main(
         raise click.ClickException(
             'Nothing to read: pass a Markdown file or --text "...".'
         )
-    if temp and not play:
-        raise click.ClickException(
-            "--temp only makes sense with --play: without playback the audio "
-            "would be left in a scratch directory you never listen to."
-        )
-    if temp and output is not None:
-        raise click.ClickException(
-            "--temp writes to a scratch directory under the system temp dir, "
-            "so --output would be ignored. Drop one of the two."
-        )
+    if check and not host:
+        raise click.ClickException("--check only applies to --host.")
     if speed <= 0:
         raise click.ClickException("--speed must be greater than 0.")
+
+    markdown = (
+        inline_text if inline_text is not None else input_file.read_text(encoding="utf-8")
+    )
+
+    # --host manda o texto pro servidor falar; --play/--stream/--temp/--output
+    # daqui nao entram nessa jogada (quem decide isso e' o --serve). So voltam
+    # a valer no caminho local abaixo, usado quando --host nao foi passado ou
+    # quando --check descobre que o servidor nao respondeu.
+    #
+    # O probe de /health roda sempre (e' rapido: ~1.5s), nao so com --check -
+    # sem isso um host inalcancavel mas roteavel deixaria send_to_server preso
+    # no timeout de sintese (300s) so pra descobrir que ninguem responde.
+    if host and not debug_parser:
+        reachable = client.check_server(host, port)
+        if not reachable:
+            if not check:
+                raise click.ClickException(
+                    f"Server at {host}:{port} did not respond. Pass --check to "
+                    "fall back to local TTS instead of failing."
+                )
+            click.echo(
+                f"warning: server at {host}:{port} did not respond, "
+                "falling back to local TTS",
+                err=True,
+            )
+        else:
+            try:
+                result = client.send_to_server(host, port, markdown, lang=lang, speed=speed)
+            except client.ServerError as exc:
+                if not check:
+                    raise click.ClickException(str(exc)) from exc
+                click.echo(f"warning: {exc}; falling back to local TTS", err=True)
+            else:
+                click.echo(f"Handled by {host}:{port}: {result.output}")
+                return
+
+    _validate_execution_flags(temp=temp, play=play, output=output)
 
     cfg_path = config_path or AppConfig.default_path()
     if not cfg_path.exists():
@@ -296,9 +410,6 @@ def main(
         config.validate()
 
     engine = TTSEngine(config)
-    markdown = (
-        inline_text if inline_text is not None else engine.read_markdown(input_file)
-    )
     blocks = engine.parse_markdown(markdown, default_lang=lang)
 
     if debug_parser:
