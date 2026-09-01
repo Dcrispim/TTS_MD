@@ -445,15 +445,18 @@ def main(
         return
 
     out_path = output or (scratch or Path("output")) / f"{stem}.wav"
-    final = engine.run(
-        markdown,
-        output=out_path,
-        default_lang=lang,
-        play=play,
-        keep_temp=keep_temp,
-        tmp_dir=work_tmp,
-        speed=speed,
-    )
+    try:
+        final = engine.run(
+            markdown,
+            output=out_path,
+            default_lang=lang,
+            play=play,
+            keep_temp=keep_temp,
+            tmp_dir=work_tmp,
+            speed=speed,
+        )
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc)) from exc
     click.echo(f"Generated: {final}")
     if keep_temp:
         click.echo(f"Work dir: {work_tmp}")

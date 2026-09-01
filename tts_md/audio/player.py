@@ -3,6 +3,7 @@ from __future__ import annotations
 import queue
 import shutil
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -33,7 +34,18 @@ def play_audio(path: Path) -> None:
         )
 
     player, executable = found
-    subprocess.run(_command(player, executable, path), check=False)
+    result = subprocess.run(
+        _command(player, executable, path),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        # check=False antes engolia isso: o player falhava (device ocupado, sem
+        # servidor de audio, etc.) e quem chamou via --serve/--host recebia
+        # "played": true e um "[ok]" no log mesmo sem nenhum som ter saido.
+        detail = (result.stderr or result.stdout or "").strip().splitlines()
+        tail = detail[-1] if detail else f"exit code {result.returncode}"
+        raise RuntimeError(f"{player} failed to play {path.name}: {tail}")
 
 
 class QueuedPlayer:
@@ -59,7 +71,13 @@ class QueuedPlayer:
             path = self._queue.get()
             if path is None:
                 return
-            play_audio(path)
+            try:
+                play_audio(path)
+            except RuntimeError as exc:
+                # Sem isso uma falha aqui (thread separada, ninguem espera o
+                # resultado por faixa) matava a thread e as proximas faixas da
+                # fila nunca tocavam - e nada avisava.
+                print(f"[tts-md] {exc}", file=sys.stderr)
 
     def wait(self) -> None:
         """Espera a fila esvaziar e encerra a thread."""
