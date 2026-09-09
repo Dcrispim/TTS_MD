@@ -118,6 +118,50 @@ Antes era um `tmp/` fixo no diretório atual, compartilhado por todas as execuç
 `tts-md` ao mesmo tempo escreviam nos mesmos `001.wav`, `002.wav`… e um truncava o áudio
 do outro **sem erro nenhum**.
 
+## Servidor remoto (`--serve` / `--host`)
+
+Uma máquina roda `tts-md --serve` e vira um "alto-falante de rede": qualquer outro
+`tts-md` na LAN pode mandar texto pra ela falar, em vez de falar localmente.
+
+```bash
+# Na máquina que vai falar (ex.: a que tem caixa de som):
+tts-md --serve --play
+
+# Em qualquer outro PC da rede:
+tts-md notas.md --host 192.168.1.50
+tts-md --text="build quebrou" --host 192.168.1.50 --play  # --play aqui só vale no fallback, veja abaixo
+```
+
+- Quem decide **como** o áudio é tratado — `--play`, `--stream`, `--temp`,
+  `--output`, `--keep-temp` — é o `--serve`, na hora que ele sobe, e vale pra
+  todo pedido que chegar enquanto ele estiver de pé. Ex.: `tts-md --serve
+  --stream --output ~/audios/live` grava cada pedido como uma playlist,
+  `tts-md --serve --temp --play` fala e descarta.
+- Quem manda o pedido (`--host`) só manda o **conteúdo**: o markdown/texto,
+  `--lang` e `--speed`. As flags de execução do lado de quem manda não têm
+  efeito enquanto o servidor responde — elas só voltam a valer se cair pro
+  fallback local (veja `--check` abaixo), porque nesse caso é como se
+  `--host` não tivesse sido passado.
+- Pedidos concorrentes de PCs diferentes entram numa fila e tocam em ordem de
+  chegada — o servidor nunca sobrepõe dois áudios.
+- Porta padrão: `8420` (`--port`). Interface padrão do `--serve`: `0.0.0.0`
+  (todas). Sem autenticação nessa versão — qualquer PC na rede que souber o
+  host:porta pode mandar o servidor falar; use numa LAN confiável.
+- `--check` faz um probe rápido (`~1.5s`) antes de mandar o texto de verdade;
+  se o servidor não responder, cai pro TTS local com um aviso, em vez de
+  falhar. Sem `--check`, host inalcançável é erro (saída 1).
+
+Também dá pra configurar por variável de ambiente, pra não repetir `--host`
+em toda chamada de uma máquina que sempre fala num servidor fixo:
+
+```bash
+export TTS_MD_HOST=192.168.1.50
+export TTS_MD_PORT=8420   # opcional, já é o padrão
+export TTS_MD_CHECK=1     # opcional, ativa o fallback local
+
+tts-md notas.md   # usa o host/porta/check das envs, sem precisar repetir as flags
+```
+
 ## Índice de idioma por termo
 
 `lang_index.yaml` diz em que idioma cada termo deve ser lido. O que não está no índice
