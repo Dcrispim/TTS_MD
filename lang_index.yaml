@@ -5,47 +5,119 @@
 #
 # Idiomas aceitos: pt, en (ou pt-BR, en-US). Termos sao case-insensitive.
 '@icv': en
+ADR:
+  lang: pt
+  text: á dê érre
+ADRs:
+  lang: pt
+  text: á dê érres
 API: pt
+APK:
+  lang: pt
+  text: á pê cá
 Account:
   lang: pt
   text: acáunt
+Android:
+  lang: pt
+  text: ândróid
 Atlassian: en
+CI:
+  lang: pt
+  text: cê í
 Cypress:
   lang: pt
   text: sáiprés
+DOM:
+  lang: pt
+  text: dóm
 DTO:
   lang: pt
   text: dê tê ó
+Dockerfile:
+  lang: pt
+  text: dóquer fáil
+Electron:
+  lang: pt
+  text: elétron
+Expo:
+  lang: pt
+  text: ékspou
+Gradle:
+  lang: pt
+  text: grêidou
 HQ:
   lang: pt
   text: agá cu
+Hermes:
+  lang: pt
+  text: érmes
 IncentPay:
   lang: pt
   text: incent pei
+JDK:
+  lang: pt
+  text: jóta dê cá
 Jest:
   lang: pt
   text: djérst
 MCP:
   lang: pt
   text: eme cê pê
+Maestro:
+  lang: pt
+  text: maéstro
+Metro:
+  lang: pt
+  text: métrou
+Next:
+  lang: pt
+  text: nékst
+OCR:
+  lang: pt
+  text: ô cê érre
 PR:
   lang: en
   text: pull request
 PostHog:
   lang: pt
   text: pôst róg
+README:
+  lang: pt
+  text: rídmi
+SDK:
+  lang: pt
+  text: ésse dê cá
+SQLite:
+  lang: pt
+  text: ésse quê láite
 StarkBank:
   lang: pt
   text: estárk bénk
+USB:
+  lang: pt
+  text: u ésse bê
+Vitest:
+  lang: pt
+  text: vaitést
+Zeitgeist:
+  lang: pt
+  text: tsáit-gáist
 adapter:
   lang: pt
   text: adápter
+adb:
+  lang: pt
+  text: á dê bê
 alias:
   lang: pt
   text: êlias
 approve:
   lang: pt
   text: apruve
+apps:
+  lang: pt
+  text: éps
 arquivo: pt
 assert:
   lang: pt
@@ -53,6 +125,12 @@ assert:
 awards:
   lang: pt
   text: auórdz
+balance:
+  lang: pt
+  text: bálanss
+banner:
+  lang: pt
+  text: bâner
 baseline:
   lang: pt
   text: béisláin
@@ -68,12 +146,18 @@ blockedMessage:
 branch:
   lang: pt
   text: brantch
+btrfs:
+  lang: pt
+  text: bê tê érre éfe ésse
 bug:
   lang: pt
   text: bágui
 bugs:
   lang: pt
   text: bágues
+build:
+  lang: pt
+  text: bíld
 buy:
   lang: pt
   text: bái
@@ -83,6 +167,9 @@ cache:
 caching:
   lang: pt
   text: quéchin
+catalog:
+  lang: pt
+  text: cátalog
 checkout:
   lang: pt
   text: tchécaut
@@ -96,6 +183,12 @@ configuração: pt
 consults:
   lang: pt
   text: consálts
+container:
+  lang: pt
+  text: contêiner
+contract:
+  lang: pt
+  text: cóntract
 controller:
   lang: pt
   text: contrôler
@@ -111,6 +204,18 @@ dedupe:
 deploy:
   lang: pt
   text: diplói
+design:
+  lang: pt
+  text: dizáin
+designer:
+  lang: pt
+  text: dizáiner
+designers:
+  lang: pt
+  text: dizáiners
+destructuring:
+  lang: pt
+  text: destrâcturing
 dev:
   lang: pt
   text: divélopment
@@ -120,6 +225,9 @@ development:
 dict:
   lang: pt
   text: dícti
+drizzle:
+  lang: pt
+  text: drízou
 email:
   lang: pt
   text: imêiu
@@ -132,6 +240,15 @@ errorCode:
 errors:
   lang: pt
   text: érrors
+fish:
+  lang: pt
+  text: fích
+fixture:
+  lang: pt
+  text: fícstchur
+flyer:
+  lang: pt
+  text: fláier
 gap:
   lang: pt
   text: gáp
@@ -141,6 +258,9 @@ gateway:
 grpc:
   lang: pt
   text: gê érre pê cê
+gzip:
+  lang: pt
+  text: dji zíp
 handler:
   lang: pt
   text: randler
@@ -150,6 +270,15 @@ hash:
 headquarter:
   lang: pt
   text: redcuórter
+health:
+  lang: pt
+  text: rélth
+hoisting:
+  lang: pt
+  text: róisting
+home:
+  lang: pt
+  text: rôum
 hook:
   lang: pt
   text: ruc
@@ -178,15 +307,27 @@ leaderboards:
 lint:
   lang: pt
   text: lint
+localStorage:
+  lang: pt
+  text: lôcal estóridj
+lockfile:
+  lang: pt
+  text: lóc fáil
 log:
   lang: pt
   text: lóg
+merge:
+  lang: pt
+  text: mérdj
 message:
   lang: pt
   text: méssidj
 metadata:
   lang: pt
   text: métadeita
+mtime:
+  lang: pt
+  text: ém táime
 multiprocessing: en
 multithread: en
 networkhub:
@@ -204,6 +345,9 @@ nullable:
 origin:
   lang: pt
   text: óridjin
+overrides:
+  lang: pt
+  text: ôuverráids
 payload:
   lang: pt
   text: pêilôud
@@ -225,18 +369,60 @@ payout:
 payouts:
   lang: pt
   text: pêiauts
+pkill:
+  lang: pt
+  text: pê quíl
 platform:
   lang: pt
   text: plátform
+pnpm:
+  lang: pt
+  text: pê ene pê eme
+preview:
+  lang: pt
+  text: prívíu
 product:
   lang: pt
   text: pródact
+radix:
+  lang: pt
+  text: rádiks
 role:
   lang: pt
   text: rôul
 rollback:
   lang: pt
   text: rôlbác
+scanner:
+  lang: pt
+  text: escâner
+schemas:
+  lang: pt
+  text: squímas
+scikit-image:
+  lang: pt
+  text: sáiquit ímidj
+score:
+  lang: pt
+  text: iscór
+self-service:
+  lang: pt
+  text: sélf sérvis
+server:
+  lang: pt
+  text: sérver
+serverId:
+  lang: pt
+  text: sérver ái dí
+smoke:
+  lang: pt
+  text: smôuc
+snapshots:
+  lang: pt
+  text: esnépchóts
+sudo:
+  lang: pt
+  text: súdo
 swagger:
   lang: pt
   text: suáguer
@@ -249,15 +435,24 @@ tier:
 tracking:
   lang: pt
   text: tráquin
+tsconfig:
+  lang: pt
+  text: tê ésse cónfig
 typecheck:
   lang: pt
   text: táipetchéc
+types:
+  lang: pt
+  text: táips
 ui:
   lang: pt
   text: u ai
 undefined:
   lang: pt
   text: andifáind
+upscale:
+  lang: pt
+  text: ápsquêil
 user:
   lang: pt
   text: iúzer
@@ -266,6 +461,9 @@ uuid:
   lang: pt
   text: u u ai dê
 wake word: en
+window:
+  lang: pt
+  text: uíndou
 wizard:
   lang: pt
   text: uízerd
@@ -278,3 +476,6 @@ workspace:
 worktree:
   lang: pt
   text: uôrktri
+zod:
+  lang: pt
+  text: zód
