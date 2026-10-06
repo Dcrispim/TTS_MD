@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import queue
 import shutil
 import subprocess
@@ -8,6 +9,32 @@ import threading
 from pathlib import Path
 
 PLAYERS = ("mpv", "aplay", "ffplay")
+
+STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))) / "tts-md"
+LAST_PLAYED_FILE = STATE_DIR / "last_played"
+
+
+def record_last_played(path: Path) -> None:
+    """Grava o audio tocado por ultimo, para --last reproduzir depois.
+
+    Melhor esforco: se o diretorio de estado nao puder ser escrito, --last
+    simplesmente nao vai encontrar nada, sem quebrar a reproducao em si.
+    """
+    try:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        LAST_PLAYED_FILE.write_text(str(path.resolve()), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def get_last_played() -> Path | None:
+    try:
+        text = LAST_PLAYED_FILE.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if not text:
+        return None
+    return Path(text)
 
 
 def find_player() -> tuple[str, str] | None:
@@ -46,6 +73,8 @@ def play_audio(path: Path) -> None:
         detail = (result.stderr or result.stdout or "").strip().splitlines()
         tail = detail[-1] if detail else f"exit code {result.returncode}"
         raise RuntimeError(f"{player} failed to play {path.name}: {tail}")
+
+    record_last_played(path)
 
 
 class QueuedPlayer:

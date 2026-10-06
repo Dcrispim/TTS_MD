@@ -162,6 +162,39 @@ export TTS_MD_CHECK=1     # opcional, ativa o fallback local
 tts-md notas.md   # usa o host/porta/check das envs, sem precisar repetir as flags
 ```
 
+## Personas
+
+Uma persona é um pacote de vozes por idioma (`{pt-BR: pf_dora, en-US: af_bella, ...}`)
+guardado com um id, para não ter que lembrar/repetir `--voice` toda vez. `--set-persona`
+só registra e ativa — não sintetiza nada:
+
+```bash
+# Registra "diego" para pt-BR e para en-US (chamadas separadas, mesma persona):
+tts-md --set-persona diego --lang pt-BR --voice pf_dora
+tts-md --set-persona diego --lang en-US --voice af_bella
+
+# A partir daqui, toda chamada nesse diretório já fala com "diego":
+tts-md notas.md
+tts-md --text "Hello there" --lang en-US
+```
+
+- `--voice <id>` sozinho (sem `--set-persona`) troca a voz só para essa execução, sem
+  mexer em persona nenhuma. Vale para `--lang` (ou o idioma padrão do config) e precisa
+  bater com o idioma — `--voice pf_dora --lang en-US` é rejeitado, porque `pf_dora` é uma
+  voz `pt-BR` (Kokoro identifica o idioma pelo prefixo da voz/nome do modelo).
+- O catálogo fica em `personas.json`, na raiz da instalação do tts-md — não versionado,
+  igual ao `config.yaml`. Cada máquina tem o seu; o mesmo id pode apontar para uma voz
+  diferente numa instalação remota.
+- A persona ativa por diretório fica em `.tts-md.persona` (JSON, também não versionado),
+  com uma entrada por alvo: `"local"` (sempre a primeira) e uma `"<host>:<port>"` por
+  servidor `--host` já usado dali. Rodar `--set-persona ... --host X --port Y` ativa a
+  persona só para aquele servidor, sem mexer na entrada `"local"`.
+- Com `--host`, o id é mandado como está no pedido (`persona`) — quem resolve pra voz é o
+  `personas.json` **do servidor**, não o desta máquina. Se o servidor não tiver esse id
+  cadastrado, o pedido falha com erro, igual a qualquer outra falha de síntese.
+- `--persona <id>` usa uma persona pontualmente, sem tocar no `.tts-md.persona`; é o que
+  vale quando dado junto, por cima do que estiver ativo no diretório.
+
 ## Índice de idioma por termo
 
 `lang_index.yaml` diz em que idioma cada termo deve ser lido. O que não está no índice

@@ -7,8 +7,8 @@ from pathlib import Path
 
 import click
 
-from tts_md import client
-from tts_md.audio.player import QueuedPlayer, find_player
+from tts_md import client, persona
+from tts_md.audio.player import QueuedPlayer, find_player, get_last_played, play_audio
 from tts_md.audio.playlist import slugify
 from tts_md.engine import TTSEngine, text_label, work_dir
 from tts_md.lang_index import (
@@ -22,6 +22,7 @@ from tts_md.lang_index import (
 )
 from tts_md.models import AppConfig
 from tts_md.server import DEFAULT_PORT, ServeOptions, run_server
+from tts_md.voices import VoiceLangMismatch, check_voice_lang
 
 
 AUDIO_SUFFIXES = {".wav", ".mp3", ".ogg", ".flac", ".m4a"}
@@ -37,6 +38,7 @@ def _run_stream(
     keep_temp: bool,
     tmp_dir: Path,
     speed: float,
+    voice_overrides: dict[str, str] | None = None,
 ) -> None:
     if out_dir.suffix.lower() in AUDIO_SUFFIXES:
         raise click.ClickException(
@@ -126,6 +128,58 @@ def _output_stem(input_file: Path | None, inline_text: str | None) -> str:
     return slugify(inline_text or "") or "text"
 
 
+def _checked_voice(config: AppConfig, target_lang: str, voice: str) -> None:
+    """Confere que `voice` bate com o idioma de `target_lang` antes de deixar
+    ela virar override (avulso ou dentro de uma persona)."""
+    try:
+        voice_cfg = config.get_voice(target_lang)
+    except KeyError as exc:
+        raise click.ClickException(str(exc)) from exc
+    try:
+        check_voice_lang(voice_cfg.engine, voice, target_lang)
+    except VoiceLangMismatch as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+def _handle_set_persona(
+    set_persona_id: str,
+    *,
+    voice_override: str | None,
+    lang: str | None,
+    host: str | None,
+    port: int,
+    config_path: Path | None,
+    blocked: bool,
+) -> None:
+    """--set-persona so registra/ativa uma persona; nunca sintetiza nada."""
+    if blocked:
+        raise click.ClickException(
+            "--set-persona only registers a persona; it doesn't read or speak "
+            "anything, so it can't be combined with a Markdown input or "
+            "execution flags."
+        )
+    if not voice_override:
+        raise click.ClickException("--set-persona requires --voice=<id>.")
+
+    cfg_path = config_path or AppConfig.default_path()
+    if not cfg_path.exists():
+        raise click.ClickException(
+            f"Config not found: {cfg_path}. Copy config.example.yaml to config.yaml."
+        )
+    config = AppConfig.load(cfg_path)
+    target_lang = lang or config.default_lang
+    _checked_voice(config, target_lang, voice_override)
+
+    persona.set_persona(
+        set_persona_id, target_lang, voice_override, host=host, port=port
+    )
+    target = persona.target_key(host, port)
+    click.echo(
+        f"Persona '{set_persona_id}' set for {target_lang} -> {voice_override} "
+        f"(active for {target} in {persona.ACTIVE_FILENAME})."
+    )
+
+
 def _validate_execution_flags(*, temp: bool, play: bool, output: Path | None) -> None:
     """Regras de --temp, compartilhadas pelo modo local e pela inicializacao
     do --serve (as duas execucoes decidem sozinhas como lidar com os arquivos)."""
@@ -170,6 +224,15 @@ def _validate_execution_flags(*, temp: bool, play: bool, output: Path | None) ->
     help="Default language for unparsed text (e.g. pt-BR).",
 )
 @click.option("--play", is_flag=True, help="Play the generated audio.")
+@click.option(
+    "--last",
+    "replay_last",
+    is_flag=True,
+    help=(
+        "Replay the most recently played audio instead of synthesizing "
+        "anything new. Takes no Markdown input."
+    ),
+)
 @click.option(
     "--speed",
     type=float,
@@ -288,12 +351,50 @@ def _validate_execution_flags(*, temp: bool, play: bool, output: Path | None) ->
         "synthesis if it does not respond. Also settable via TTS_MD_CHECK."
     ),
 )
+@click.option(
+    "--voice",
+    "voice_override",
+    default=None,
+    metavar="VOICE",
+    help=(
+        "Override the voice used for --lang (or the default language) just "
+        "for this run. Must match that language's engine (e.g. a Kokoro "
+        "'af_'/'am_' voice for en-US, 'pf_'/'pm_' for pt-BR). Required by "
+        "--set-persona; on its own it doesn't touch any persona file."
+    ),
+)
+@click.option(
+    "--set-persona",
+    "set_persona_id",
+    default=None,
+    metavar="ID",
+    help=(
+        "Register ID -> --voice for --lang (or the default language) in "
+        "personas.json, and make ID the active persona for this directory "
+        "(or for --host/--port, if given). Doesn't read or speak anything; "
+        "run it again with another --lang/--voice to add languages to the "
+        "same persona."
+    ),
+)
+@click.option(
+    "--persona",
+    "persona_id",
+    default=None,
+    metavar="ID",
+    help=(
+        "Use this persona for the run instead of whatever is active in "
+        f"{persona.ACTIVE_FILENAME}. Resolved against this machine's "
+        "personas.json when speaking locally; with --host, the id is "
+        "forwarded as-is and resolved on the server's own personas.json."
+    ),
+)
 def main(
     input_file: Path | None,
     inline_text: str | None,
     output: Path | None,
     lang: str | None,
     play: bool,
+    replay_last: bool,
     speed: float,
     stream: bool,
     temp: bool,
@@ -309,13 +410,69 @@ def main(
     host: str | None,
     port: int,
     check: bool,
+    voice_override: str | None,
+    set_persona_id: str | None,
+    persona_id: str | None,
 ) -> None:
     """Convert Markdown to speech using modular parsers and offline TTS."""
+    if replay_last:
+        if input_file is not None or inline_text is not None:
+            raise click.ClickException(
+                "--last replays the last played audio; it doesn't take a Markdown input."
+            )
+        if serve:
+            raise click.ClickException("--last doesn't apply to --serve.")
+        if find_player() is None:
+            raise click.ClickException(
+                "No audio player found. Install mpv, aplay, or ffplay for --last."
+            )
+        last_path = get_last_played()
+        if last_path is None:
+            raise click.ClickException("No previously played audio found.")
+        if not last_path.exists():
+            # Comum quando o ultimo audio veio de --temp: o SO ja pode ter
+            # limpo o diretorio de scratch (reboot, systemd-tmpfiles, etc.).
+            raise click.ClickException(
+                f"The last played audio no longer exists: {last_path}"
+            )
+        click.echo(f"Replaying: {last_path}")
+        try:
+            play_audio(last_path)
+        except RuntimeError as exc:
+            raise click.ClickException(str(exc)) from exc
+        return
+
     if replace and not add_terms:
         raise click.ClickException("--replace only applies to --add-term.")
     if add_terms or exist_terms or list_terms:
         _manage_index(
             add_terms, exist_terms, replace=replace, list_terms=list_terms
+        )
+        return
+
+    if set_persona_id:
+        if persona_id:
+            raise click.ClickException(
+                "--set-persona and --persona are mutually exclusive."
+            )
+        blocked = (
+            input_file is not None
+            or inline_text is not None
+            or play
+            or stream
+            or temp
+            or debug_parser
+            or keep_temp
+            or serve
+        )
+        _handle_set_persona(
+            set_persona_id,
+            voice_override=voice_override,
+            lang=lang,
+            host=host,
+            port=port,
+            config_path=config_path,
+            blocked=blocked,
         )
         return
 
@@ -360,6 +517,16 @@ def main(
         inline_text if inline_text is not None else input_file.read_text(encoding="utf-8")
     )
 
+    # Explicito (--persona) vence; senao olha o .tts-md.persona do diretorio
+    # atual para o host:port de destino. Se cair no fallback local (--check),
+    # a resolucao e' refeita mais abaixo para o alvo "local".
+    try:
+        resolved_persona_for_host = persona.resolve_persona_id(
+            persona_id, host=host, port=port
+        )
+    except persona.PersonaError as exc:
+        raise click.ClickException(str(exc)) from exc
+
     # --host manda o texto pro servidor falar; --play/--stream/--temp/--output
     # daqui nao entram nessa jogada (quem decide isso e' o --serve). So voltam
     # a valer no caminho local abaixo, usado quando --host nao foi passado ou
@@ -383,7 +550,14 @@ def main(
             )
         else:
             try:
-                result = client.send_to_server(host, port, markdown, lang=lang, speed=speed)
+                result = client.send_to_server(
+                    host,
+                    port,
+                    markdown,
+                    lang=lang,
+                    speed=speed,
+                    persona=resolved_persona_for_host,
+                )
             except client.ServerError as exc:
                 if not check:
                     raise click.ClickException(str(exc)) from exc
@@ -409,8 +583,30 @@ def main(
             raise click.ClickException("ffmpeg is required but was not found in PATH.")
         config.validate()
 
+    # Resolucao local: --persona/.tts-md.persona sao lidos de novo para o alvo
+    # "local" (importa quando --host foi dado mas caiu no fallback do --check).
+    try:
+        resolved_persona_local = persona.resolve_persona_id(
+            persona_id, host=None, port=port
+        )
+    except persona.PersonaError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    voice_overrides: dict[str, str] = {}
+    if resolved_persona_local:
+        try:
+            voice_overrides.update(persona.get_voice_bundle(resolved_persona_local))
+        except persona.PersonaError as exc:
+            raise click.ClickException(str(exc)) from exc
+    if voice_override:
+        target_lang = lang or config.default_lang
+        _checked_voice(config, target_lang, voice_override)
+        voice_overrides[target_lang] = voice_override
+
     engine = TTSEngine(config)
-    blocks = engine.parse_markdown(markdown, default_lang=lang)
+    blocks = engine.parse_markdown(
+        markdown, default_lang=lang, voice_overrides=voice_overrides
+    )
 
     if debug_parser:
         payload = [block.to_dict() for block in blocks]
@@ -439,6 +635,7 @@ def main(
             keep_temp=keep_temp,
             tmp_dir=work_tmp,
             speed=speed,
+            voice_overrides=voice_overrides,
         )
         if keep_temp:
             click.echo(f"Work dir: {work_tmp}")
@@ -454,6 +651,7 @@ def main(
             keep_temp=keep_temp,
             tmp_dir=work_tmp,
             speed=speed,
+            voice_overrides=voice_overrides,
         )
     except RuntimeError as exc:
         raise click.ClickException(str(exc)) from exc

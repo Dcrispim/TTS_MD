@@ -9,6 +9,7 @@ from itertools import groupby
 from pathlib import Path
 
 from tts_md.models import AppConfig, SpeechBlock, StreamTrack
+from tts_md.persona import apply_voice_overrides
 from tts_md.parsers import PARSERS
 from tts_md.parsers.codeblock import CodeBlockParser
 from tts_md.parsers.langindex import LangIndexParser
@@ -76,6 +77,7 @@ class TTSEngine:
         text: str,
         *,
         default_lang: str | None = None,
+        voice_overrides: dict[str, str] | None = None,
     ) -> list[SpeechBlock]:
         lang = default_lang or self.config.default_lang
         blocks: list[SpeechBlock] = []
@@ -122,7 +124,10 @@ class TTSEngine:
             blocks.extend(parsed)
             index += 1
 
-        return self._filter_blocks(blocks)
+        filtered = self._filter_blocks(blocks)
+        if voice_overrides:
+            apply_voice_overrides(filtered, voice_overrides)
+        return filtered
 
     def _parse_line(self, line: str, *, default_lang: str) -> list[SpeechBlock]:
         for parser in PARSERS:
@@ -214,6 +219,7 @@ class TTSEngine:
         keep_temp: bool = False,
         tmp_dir: Path | None = None,
         speed: float = 1.0,
+        voice_overrides: dict[str, str] | None = None,
     ) -> Iterator[StreamTrack]:
         """Gera um audio por linha do Markdown, entregando cada faixa assim que fica pronta.
 
@@ -223,7 +229,9 @@ class TTSEngine:
         A playlist cresce junto com os arquivos, entao da para comecar a ouvir
         antes de a ultima linha ser sintetizada.
         """
-        blocks = self.parse_markdown(text, default_lang=default_lang)
+        blocks = self.parse_markdown(
+            text, default_lang=default_lang, voice_overrides=voice_overrides
+        )
 
         if not blocks:
             raise ValueError("No speakable content found after parsing.")
@@ -272,9 +280,12 @@ class TTSEngine:
         keep_temp: bool = False,
         tmp_dir: Path | None = None,
         speed: float = 1.0,
+        voice_overrides: dict[str, str] | None = None,
     ) -> Path:
         """Sintetiza o Markdown ja lido (veja read_markdown) num arquivo unico."""
-        blocks = self.parse_markdown(text, default_lang=default_lang)
+        blocks = self.parse_markdown(
+            text, default_lang=default_lang, voice_overrides=voice_overrides
+        )
 
         if not blocks:
             raise ValueError("No speakable content found after parsing.")

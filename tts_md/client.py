@@ -37,12 +37,19 @@ def send_to_server(
     *,
     lang: str | None,
     speed: float,
+    persona: str | None = None,
     timeout: float = 300.0,
 ) -> ServerResult:
     """Manda o markdown para um tts-md --serve falar. Bloqueia ate ele terminar
     de processar (o mesmo tempo que a sintese+reproducao levariam localmente).
+
+    `persona` e' so o id: quem resolve a voz e' o catalogo local do proprio
+    servidor (personas.json dele pode mapear o mesmo id para uma voz diferente
+    da que essa maquina usaria).
     """
-    payload = json.dumps({"text": text, "lang": lang, "speed": speed}).encode("utf-8")
+    payload = json.dumps(
+        {"text": text, "lang": lang, "speed": speed, "persona": persona}
+    ).encode("utf-8")
     request = urllib.request.Request(
         _url(host, port, "/speak"),
         data=payload,

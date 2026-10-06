@@ -14,6 +14,7 @@ import click
 from tts_md.audio.playlist import slugify
 from tts_md.engine import TTSEngine, work_dir
 from tts_md.models import AppConfig
+from tts_md import persona as persona_mod
 
 DEFAULT_PORT = 8420
 
@@ -34,10 +35,13 @@ class ServeOptions:
 
 
 class _Job:
-    def __init__(self, text: str, lang: str | None, speed: float) -> None:
+    def __init__(
+        self, text: str, lang: str | None, speed: float, persona: str | None = None
+    ) -> None:
         self.text = text
         self.lang = lang
         self.speed = speed
+        self.persona = persona
         self.done = threading.Event()
         self.result: dict | None = None
         self.error: str | None = None
@@ -74,6 +78,11 @@ def _process_job(job: _Job, engine: TTSEngine, opts: ServeOptions) -> None:
     stem = _stem(job.text)
     target, scratch = _resolve_target(opts, stem)
     work_tmp = work_dir(stem)
+    # Resolvido contra o catalogo desta maquina: o mesmo id pode apontar para
+    # uma voz diferente do lado de quem mandou o pedido.
+    voice_overrides = (
+        persona_mod.get_voice_bundle(job.persona) if job.persona else None
+    )
     try:
         if opts.stream:
             _run_stream(
@@ -85,6 +94,7 @@ def _process_job(job: _Job, engine: TTSEngine, opts: ServeOptions) -> None:
                 keep_temp=opts.keep_temp,
                 tmp_dir=work_tmp,
                 speed=job.speed,
+                voice_overrides=voice_overrides,
             )
             job.result = {"mode": "stream", "output": str(target), "played": opts.play}
         else:
@@ -96,6 +106,7 @@ def _process_job(job: _Job, engine: TTSEngine, opts: ServeOptions) -> None:
                 keep_temp=opts.keep_temp,
                 tmp_dir=work_tmp,
                 speed=job.speed,
+                voice_overrides=voice_overrides,
             )
             job.result = {"mode": "single", "output": str(final), "played": opts.play}
     except Exception as exc:  # noqa: BLE001 - reportado ao cliente, servidor segue de pe
@@ -136,7 +147,7 @@ def _make_handler(jobs: "queue.Queue[_Job]") -> type[BaseHTTPRequestHandler]:
                 return
 
             speed = float(payload.get("speed") or 1.0)
-            job = _Job(text, payload.get("lang"), speed)
+            job = _Job(text, payload.get("lang"), speed, payload.get("persona"))
             jobs.put(job)
             # Enfileirado: se outro pedido estiver falando, este espera a vez
             # dele chegar na fila antes de ser processado.
