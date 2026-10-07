@@ -291,6 +291,7 @@ class TTSEngine:
                     path=final_path,
                     text=title,
                     lang=group[0].lang,
+                    line_no=group[0].line_no,
                 )
 
         if not keep_temp:
@@ -307,6 +308,7 @@ class TTSEngine:
         tmp_dir: Path | None = None,
         speed: float = 1.0,
         voice_overrides: dict[str, str] | None = None,
+        spans: dict[int, tuple[float, float]] | None = None,
     ) -> Path:
         """Sintetiza o Markdown ja lido (veja read_markdown) num arquivo unico."""
         blocks = self.parse_markdown(
@@ -317,11 +319,13 @@ class TTSEngine:
             raise ValueError("No speakable content found after parsing.")
 
         work_tmp = tmp_dir or work_dir(text_label(text))
-        wav_files = self.synthesize_blocks(blocks, work_tmp, speed=speed)
+        parts = self.synthesize_blocks_with_lines(blocks, work_tmp, speed=speed)
 
         output.parent.mkdir(parents=True, exist_ok=True)
         # Os intermediarios normalizados ficam no work dir, nao no destino final.
-        final_path = concat_audio(wav_files, output, scratch_dir=work_tmp)
+        final_path = concat_audio([path for path, _ in parts], output, scratch_dir=work_tmp)
+        if spans is not None:
+            spans.update(line_spans(parts))
 
         # O audio final ja esta gravado: os WAVs por bloco nao servem mais.
         if not keep_temp:

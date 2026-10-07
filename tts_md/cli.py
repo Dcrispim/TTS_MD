@@ -3,13 +3,21 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
+from contextlib import ExitStack
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
 from tts_md import client, persona
-from tts_md.audio.player import QueuedPlayer, find_player, get_last_played, play_audio
-from tts_md.audio.playlist import slugify
+from tts_md.audio.player import (
+    QueuedPlayer,
+    find_player,
+    get_last_played,
+    missing_player_message,
+    play_audio,
+)
+from tts_md.audio.playlist import M3UWriter, slugify
 from tts_md.engine import TTSEngine, text_label, work_dir
 from tts_md.lang_index import (
     DEFAULT_INDEX_PATH,
@@ -22,7 +30,12 @@ from tts_md.lang_index import (
 )
 from tts_md.models import AppConfig
 from tts_md.server import DEFAULT_PORT, ServeOptions, run_server
+from tts_md.visual import VideoDepsError, require_video_deps
 from tts_md.voices import VoiceLangMismatch, check_voice_lang
+
+if TYPE_CHECKING:
+    from tts_md.visual.cues import CueExtraction
+    from tts_md.visual.video import StreamVideo
 
 
 AUDIO_SUFFIXES = {".wav", ".mp3", ".ogg", ".flac", ".m4a"}
@@ -39,8 +52,10 @@ def _run_stream(
     tmp_dir: Path,
     speed: float,
     voice_overrides: dict[str, str] | None = None,
+    video: StreamVideo | None = None,
 ) -> None:
-    if out_dir.suffix.lower() in AUDIO_SUFFIXES:
+    file_suffixes = AUDIO_SUFFIXES | {".mp4"} if video is not None else AUDIO_SUFFIXES
+    if out_dir.suffix.lower() in file_suffixes:
         raise click.ClickException(
             f"--stream writes a directory of tracks, but --output looks like a "
             f"file: {out_dir}. Pass a directory instead."
@@ -48,32 +63,71 @@ def _run_stream(
 
     player = None
     if play:
-        if find_player() is None:
-            raise click.ClickException(
-                "No audio player found. Install mpv, aplay, or ffplay for --play."
-            )
-        player = QueuedPlayer()
+        if find_player(video=video is not None) is None:
+            raise click.ClickException(missing_player_message(video=video is not None))
+        player = QueuedPlayer(video=video is not None)
 
     count = 0
-    try:
-        for track in engine.run_stream(
-            markdown,
-            out_dir=out_dir,
-            default_lang=lang,
-            keep_temp=keep_temp,
-            tmp_dir=tmp_dir,
-            speed=speed,
-        ):
-            count += 1
-            click.echo(f"{track.path.name}  [{track.lang}] {track.text}")
+    with ExitStack() as stack:
+        playlist = None
+        if video is not None:
+            playlist = stack.enter_context(M3UWriter(out_dir / "playlist.m3u"))
+        try:
+            for track in engine.run_stream(
+                markdown,
+                out_dir=tmp_dir / "tracks" if video is not None else out_dir,
+                default_lang=lang,
+                keep_temp=keep_temp or video is not None,
+                tmp_dir=tmp_dir,
+                speed=speed,
+            ):
+                count += 1
+                path = track.path
+                if video is not None:
+                    try:
+                        path = video.add(path, track.line_no, out_dir / f"{path.stem}.mp4")
+                    except RuntimeError as exc:
+                        raise click.ClickException(str(exc)) from exc
+                    playlist.add(path, track.text)
+                click.echo(f"{path.name}  [{track.lang}] {track.text}")
+                if player is not None:
+                    player.add(path)
+        finally:
             if player is not None:
-                player.add(track.path)
-    finally:
-        if player is not None:
-            player.wait()
+                player.wait()
+            if video is not None and not keep_temp:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
 
+    if video is not None:
+        _echo_warnings(video.warnings())
     click.echo(f"Generated {count} tracks in {out_dir}")
     click.echo(f"Playlist: {out_dir / 'playlist.m3u'}")
+
+
+def _echo_warnings(warnings: list[str]) -> None:
+    for warning in warnings:
+        click.echo(f"warning: {warning}", err=True)
+
+
+def _prepare_video(extraction: CueExtraction, base: Path, *, play: bool) -> dict:
+    try:
+        require_video_deps()
+    except VideoDepsError as exc:
+        raise click.ClickException(str(exc)) from exc
+    from tts_md.visual.video import FileSystemResolver, format_warning, image_refs
+
+    if play and find_player(video=True) is None:
+        raise click.ClickException(missing_player_message(video=True))
+    resolution = FileSystemResolver(base).resolve(image_refs(extraction))
+    if resolution.missing:
+        listed = "\n".join(f"  {ref}: {why}" for ref, why in resolution.missing.items())
+        raise click.ClickException(
+            f"{len(resolution.missing)} image(s) referenced in the Markdown could not "
+            f"be loaded (relative paths resolve against {base}); nothing was "
+            f"synthesized:\n{listed}"
+        )
+    _echo_warnings([format_warning(w) for w in extraction.warnings])
+    return resolution.images
 
 
 def _manage_index(
@@ -193,6 +247,54 @@ def _validate_execution_flags(*, temp: bool, play: bool, output: Path | None) ->
             "--temp writes to a scratch directory under the system temp dir, "
             "so --output would be ignored. Drop one of the two."
         )
+
+
+def _run_video(
+    engine: TTSEngine,
+    markdown: str,
+    *,
+    output: Path,
+    audio: Path,
+    lang: str | None,
+    play: bool,
+    keep_temp: bool,
+    tmp_dir: Path,
+    speed: float,
+    voice_overrides: dict[str, str],
+    config: AppConfig,
+    images: dict,
+) -> None:
+    from tts_md.visual.video import render_document
+
+    spans: dict[int, tuple[float, float]] = {}
+    try:
+        engine.run(
+            markdown,
+            output=audio,
+            default_lang=lang,
+            keep_temp=True,
+            tmp_dir=tmp_dir,
+            speed=speed,
+            voice_overrides=voice_overrides,
+            spans=spans,
+        )
+        warnings = render_document(
+            engine.last_cues, spans, audio, output, config.video, images, work_dir=tmp_dir
+        )
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        if not keep_temp:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+    _echo_warnings(warnings)
+    click.echo(f"Generated: {output}")
+    if keep_temp:
+        click.echo(f"Work dir: {tmp_dir}")
+    if play:
+        try:
+            play_audio(output, video=True)
+        except RuntimeError as exc:
+            raise click.ClickException(str(exc)) from exc
 
 
 @click.command()
@@ -388,6 +490,27 @@ def _validate_execution_flags(*, temp: bool, play: bool, output: Path | None) ->
         "forwarded as-is and resolved on the server's own personas.json."
     ),
 )
+@click.option(
+    "--video",
+    is_flag=True,
+    help=(
+        "Render an .mp4 instead of audio: the ![[image]], !{x,y}, !{Lx-y} and "
+        "!{clear} tags and the fenced code blocks of the Markdown become what "
+        "is shown on screen while it is spoken. With --stream, one .mp4 per "
+        "line. Requires the video extra: pip install 'tts-md[video]'."
+    ),
+)
+@click.option(
+    "--images",
+    "images_dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "With --video, resolve relative image references against this "
+        "directory instead of the Markdown file's directory (or the current "
+        "directory with --text)."
+    ),
+)
 def main(
     input_file: Path | None,
     inline_text: str | None,
@@ -413,6 +536,8 @@ def main(
     voice_override: str | None,
     set_persona_id: str | None,
     persona_id: str | None,
+    video: bool,
+    images_dir: Path | None,
 ) -> None:
     """Convert Markdown to speech using modular parsers and offline TTS."""
     if replay_last:
@@ -437,7 +562,7 @@ def main(
             )
         click.echo(f"Replaying: {last_path}")
         try:
-            play_audio(last_path)
+            play_audio(last_path, video=last_path.suffix.lower() == ".mp4")
         except RuntimeError as exc:
             raise click.ClickException(str(exc)) from exc
         return
@@ -476,6 +601,11 @@ def main(
         )
         return
 
+    if images_dir is not None and not video:
+        raise click.ClickException("--images only applies to --video.")
+    if video and serve:
+        raise click.ClickException("--video is not supported with --serve yet.")
+
     if serve:
         if input_file is not None or inline_text is not None:
             raise click.ClickException(
@@ -510,6 +640,11 @@ def main(
         )
     if check and not host:
         raise click.ClickException("--check only applies to --host.")
+    if video and host and not debug_parser:
+        raise click.ClickException(
+            "--video is not supported with --host yet; drop --host (or unset "
+            "TTS_MD_HOST) to render the video locally."
+        )
     if speed <= 0:
         raise click.ClickException("--speed must be greater than 0.")
 
@@ -616,6 +751,15 @@ def main(
     if not blocks:
         raise click.ClickException("No speakable content found after parsing.")
 
+    video_images = None
+    if video:
+        if not stream and output is not None and output.suffix.lower() != ".mp4":
+            raise click.ClickException(
+                f"--video writes an .mp4, but --output is {output}. Use an .mp4 path."
+            )
+        base = input_file.resolve().parent if input_file is not None else Path.cwd()
+        video_images = _prepare_video(engine.last_cues, images_dir or base, play=play)
+
     # Com --temp o audio e descartavel: sai num diretorio proprio sob o temp do
     # sistema, que o SO limpa sozinho, em vez de acumular em output/.
     scratch = Path(tempfile.mkdtemp(prefix="tts-md-")) if temp else None
@@ -626,6 +770,13 @@ def main(
     )
 
     if stream:
+        stream_video = None
+        if video:
+            from tts_md.visual.video import StreamVideo
+
+            stream_video = StreamVideo(
+                engine.last_cues, config.video, video_images, work_dir=work_tmp
+            )
         _run_stream(
             engine,
             markdown,
@@ -636,9 +787,27 @@ def main(
             tmp_dir=work_tmp,
             speed=speed,
             voice_overrides=voice_overrides,
+            video=stream_video,
         )
         if keep_temp:
             click.echo(f"Work dir: {work_tmp}")
+        return
+
+    if video:
+        _run_video(
+            engine,
+            markdown,
+            output=output or (scratch or Path("output")) / f"{stem}.mp4",
+            audio=work_tmp / f"{stem}.wav",
+            lang=lang,
+            play=play,
+            keep_temp=keep_temp,
+            tmp_dir=work_tmp,
+            speed=speed,
+            voice_overrides=voice_overrides,
+            config=config,
+            images=video_images,
+        )
         return
 
     out_path = output or (scratch or Path("output")) / f"{stem}.wav"

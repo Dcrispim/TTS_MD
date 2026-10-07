@@ -30,6 +30,7 @@ class StreamTrack:
     path: Path
     text: str
     lang: str
+    line_no: int = 0
 
 
 @dataclass
