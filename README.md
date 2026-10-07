@@ -415,6 +415,29 @@ tts-md --text "Hello there" --lang en-US
 - `--persona <id>` usa uma persona pontualmente, sem tocar no `.tts-md.persona`; é o que
   vale quando dado junto, por cima do que estiver ativo no diretório.
 
+## Skill `/speak` (Claude Code)
+
+`skills/speak/SKILL.md` é um template de skill do Claude Code que usa o `tts-md` a partir
+de qualquer projeto: ler arquivos ou textos em voz alta, gerenciar o `lang_index.yaml` e
+decidir sozinho quando vale gerar vídeo (`--video`), com os critérios e a sintaxe das tags.
+
+O template aponta para `~/projs/TTS_MD` (binário em `.venv/bin/tts-md`, `config.yaml`,
+`lang_index.yaml`). Para instalar:
+
+```bash
+mkdir -p ~/.claude/skills/speak
+cp skills/speak/SKILL.md ~/.claude/skills/speak/SKILL.md
+```
+
+Se o repositório estiver em outro lugar, troque o caminho ao copiar:
+
+```bash
+sed "s|~/projs/TTS_MD|$PWD|g" skills/speak/SKILL.md > ~/.claude/skills/speak/SKILL.md
+```
+
+A cópia instalada é independente: ajuste-a à vontade, e atualize o template aqui quando a
+mudança valer para todo mundo.
+
 ## Índice de idioma por termo
 
 `lang_index.yaml` diz em que idioma cada termo deve ser lido. O que não está no índice
