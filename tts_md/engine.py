@@ -9,6 +9,7 @@ from itertools import groupby
 from pathlib import Path
 
 from tts_md.models import AppConfig, SpeechBlock, StreamTrack
+from tts_md.persona import apply_voice_overrides
 from tts_md.parsers import PARSERS
 from tts_md.parsers.codeblock import CodeBlockParser
 from tts_md.parsers.langindex import LangIndexParser
@@ -18,10 +19,12 @@ from tts_md.audio.ffmpeg import (
     cleanup_temp,
     concat_audio,
     normalize_sample_rate,
+    probe_duration,
 )
 from tts_md.audio.player import play_audio
 from tts_md.audio.playlist import M3UWriter, slugify, track_name
 from tts_md.tts.router import TTSRouter
+from tts_md.visual.cues import CueExtraction, extract_cues
 
 SPEAKABLE_RE = re.compile(r"\w", re.UNICODE)
 
@@ -55,6 +58,17 @@ def work_dir(label: str) -> Path:
     return path
 
 
+def line_spans(parts: list[tuple[Path, int]]) -> dict[int, tuple[float, float]]:
+    spans: dict[int, tuple[float, float]] = {}
+    cursor = 0.0
+    for path, line_no in parts:
+        end = cursor + probe_duration(path)
+        start = spans[line_no][0] if line_no in spans else cursor
+        spans[line_no] = (start, end)
+        cursor = end
+    return spans
+
+
 class TTSEngine:
     def __init__(self, config: AppConfig):
         self.config = config
@@ -62,6 +76,7 @@ class TTSEngine:
         self._code_parser = CodeBlockParser()
         self._lang_index = LangIndexParser()
         self._table_parser = TableParser()
+        self.last_cues: CueExtraction | None = None
 
     def read_markdown(self, source: Path | str) -> str:
         if isinstance(source, Path):
@@ -76,7 +91,10 @@ class TTSEngine:
         text: str,
         *,
         default_lang: str | None = None,
+        voice_overrides: dict[str, str] | None = None,
     ) -> list[SpeechBlock]:
+        self.last_cues = extract_cues(text)
+        text = self.last_cues.markdown
         lang = default_lang or self.config.default_lang
         blocks: list[SpeechBlock] = []
         in_code_block = False
@@ -122,7 +140,10 @@ class TTSEngine:
             blocks.extend(parsed)
             index += 1
 
-        return self._filter_blocks(blocks)
+        filtered = self._filter_blocks(blocks)
+        if voice_overrides:
+            apply_voice_overrides(filtered, voice_overrides)
+        return filtered
 
     def _parse_line(self, line: str, *, default_lang: str) -> list[SpeechBlock]:
         for parser in PARSERS:
@@ -166,20 +187,30 @@ class TTSEngine:
         *,
         speed: float = 1.0,
     ) -> list[Path]:
+        parts = self.synthesize_blocks_with_lines(blocks, tmp_dir, speed=speed)
+        return [path for path, _ in parts]
+
+    def synthesize_blocks_with_lines(
+        self,
+        blocks: list[SpeechBlock],
+        tmp_dir: Path,
+        *,
+        speed: float = 1.0,
+    ) -> list[tuple[Path, int]]:
         tmp_dir.mkdir(parents=True, exist_ok=True)
-        wav_files: list[Path] = []
+        parts: list[tuple[Path, int]] = []
 
         for index, block in enumerate(blocks, start=1):
             out_path = tmp_dir / f"{index:03d}.wav"
             generated = self.router.synthesize(block, out_path, speed=speed)
-            wav_files.append(generated)
+            parts.append((generated, block.line_no))
 
             if block.pause_after > 0:
                 pause_path = tmp_dir / f"{index:03d}_pause.wav"
                 self._create_silence(pause_path, block.pause_after)
-                wav_files.append(pause_path)
+                parts.append((pause_path, block.line_no))
 
-        return wav_files
+        return parts
 
     def _synthesize_group(
         self,
@@ -214,6 +245,7 @@ class TTSEngine:
         keep_temp: bool = False,
         tmp_dir: Path | None = None,
         speed: float = 1.0,
+        voice_overrides: dict[str, str] | None = None,
     ) -> Iterator[StreamTrack]:
         """Gera um audio por linha do Markdown, entregando cada faixa assim que fica pronta.
 
@@ -223,7 +255,9 @@ class TTSEngine:
         A playlist cresce junto com os arquivos, entao da para comecar a ouvir
         antes de a ultima linha ser sintetizada.
         """
-        blocks = self.parse_markdown(text, default_lang=default_lang)
+        blocks = self.parse_markdown(
+            text, default_lang=default_lang, voice_overrides=voice_overrides
+        )
 
         if not blocks:
             raise ValueError("No speakable content found after parsing.")
@@ -257,6 +291,7 @@ class TTSEngine:
                     path=final_path,
                     text=title,
                     lang=group[0].lang,
+                    line_no=group[0].line_no,
                 )
 
         if not keep_temp:
@@ -272,19 +307,25 @@ class TTSEngine:
         keep_temp: bool = False,
         tmp_dir: Path | None = None,
         speed: float = 1.0,
+        voice_overrides: dict[str, str] | None = None,
+        spans: dict[int, tuple[float, float]] | None = None,
     ) -> Path:
         """Sintetiza o Markdown ja lido (veja read_markdown) num arquivo unico."""
-        blocks = self.parse_markdown(text, default_lang=default_lang)
+        blocks = self.parse_markdown(
+            text, default_lang=default_lang, voice_overrides=voice_overrides
+        )
 
         if not blocks:
             raise ValueError("No speakable content found after parsing.")
 
         work_tmp = tmp_dir or work_dir(text_label(text))
-        wav_files = self.synthesize_blocks(blocks, work_tmp, speed=speed)
+        parts = self.synthesize_blocks_with_lines(blocks, work_tmp, speed=speed)
 
         output.parent.mkdir(parents=True, exist_ok=True)
         # Os intermediarios normalizados ficam no work dir, nao no destino final.
-        final_path = concat_audio(wav_files, output, scratch_dir=work_tmp)
+        final_path = concat_audio([path for path, _ in parts], output, scratch_dir=work_tmp)
+        if spans is not None:
+            spans.update(line_spans(parts))
 
         # O audio final ja esta gravado: os WAVs por bloco nao servem mais.
         if not keep_temp:

@@ -12,6 +12,11 @@ callbacks.yaml
 *.log
 *.pid
 
+# Catalogo de personas (id -> voz por idioma), local desta maquina, e o
+# arquivo de persona ativa por diretorio de projeto.
+personas.json
+.tts-md.persona
+
 # Modelos TTS: centenas de MB baixados das releases upstream, nao versionados.
 # Veja o README para onde baixar e config.example.yaml para apontar o caminho.
 models/

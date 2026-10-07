@@ -5,13 +5,25 @@
 #
 # Idiomas aceitos: pt, en (ou pt-BR, en-US). Termos sao case-insensitive.
 '@icv': en
+ADR:
+  lang: pt
+  text: á dê érre
+ADRs:
+  lang: pt
+  text: á dê érres
 API: pt
+APK:
+  lang: pt
+  text: á pê cá
 AST:
   lang: en
   text: êi-és-tí
 Account:
   lang: pt
   text: acáunt
+Android:
+  lang: pt
+  text: ândróid
 Atlassian: en
 AwardInfo:
   lang: pt
@@ -19,6 +31,9 @@ AwardInfo:
 BankInstitution:
   lang: pt
   text: bénk institiúchon
+CI:
+  lang: pt
+  text: cê í
 CPF:
   lang: pt
   text: cê pê éfe
@@ -34,25 +49,46 @@ CpfLog:
 Cypress:
   lang: pt
   text: sáiprés
+DOM:
+  lang: pt
+  text: dóm
 DTO:
   lang: pt
   text: dê tê ó
 DTOs:
   lang: pt
   text: dê tê ós
+Dockerfile:
+  lang: pt
+  text: dóquer fáil
+Electron:
+  lang: pt
+  text: elétron
+Expo:
+  lang: pt
+  text: ékspou
 GitHub: en
+Gradle:
+  lang: pt
+  text: grêidou
 HQ:
   lang: pt
   text: agá cu
 HTTPS:
   lang: pt
   text: agá tê tê pê ésse
+Hermes:
+  lang: pt
+  text: érmes
 Hurl:
   lang: pt
   text: rârl
 IncentPay:
   lang: pt
   text: incent pei
+JDK:
+  lang: pt
+  text: jóta dê cá
 JSON:
   lang: pt
   text: djêisson
@@ -68,10 +104,22 @@ LimitConfig:
 MCP:
   lang: pt
   text: eme cê pê
+Maestro:
+  lang: pt
+  text: maéstro
+Metro:
+  lang: pt
+  text: métrou
+Next:
+  lang: pt
+  text: nékst
 Nx:
   lang: pt
   text: éne xis
-PIX: pt
+OCR:
+  lang: pt
+  text: ô cê érre
+PIX:
   lang: pt
   text: píx
 PR:
@@ -86,11 +134,20 @@ PostHog:
 Purchase:
   lang: pt
   text: pârtchas
+README:
+  lang: pt
+  text: rídmi
 REST: en
 RabbitMQ: en
+SDK:
+  lang: pt
+  text: ésse dê cá
 SLA:
   lang: pt
   text: ésse éle á
+SQLite:
+  lang: pt
+  text: ésse quê láite
 SendGrid:
   lang: pt
   text: sénd grid
@@ -100,12 +157,21 @@ StarkBank:
 TED:
   lang: pt
   text: tédi
+USB:
+  lang: pt
+  text: u ésse bê
 Vitest:
   lang: pt
   text: vaitést
+Zeitgeist:
+  lang: pt
+  text: tsáit-gáist
 adapter:
   lang: pt
   text: adápter
+adb:
+  lang: pt
+  text: á dê bê
 admin:
   lang: pt
   text: adimín
@@ -115,6 +181,9 @@ alias:
 approve:
   lang: pt
   text: apruve
+apps:
+  lang: pt
+  text: éps
 arquivo: pt
 assert:
   lang: pt
@@ -130,6 +199,12 @@ backend:
   lang: pt
   text: béquend
 backfill: en
+balance:
+  lang: pt
+  text: bálanss
+banner:
+  lang: pt
+  text: bâner
 baseline:
   lang: pt
   text: béisláin
@@ -148,6 +223,9 @@ board:
 branch:
   lang: pt
   text: brantch
+btrfs:
+  lang: pt
+  text: bê tê érre éfe ésse
 bug:
   lang: pt
   text: bágui
@@ -197,6 +275,12 @@ configuração: pt
 consults:
   lang: pt
   text: consálts
+container:
+  lang: pt
+  text: contêiner
+contract:
+  lang: pt
+  text: cóntract
 controller:
   lang: pt
   text: contrôler
@@ -212,6 +296,18 @@ dedupe:
 deploy:
   lang: pt
   text: diplói
+design:
+  lang: pt
+  text: dizáin
+designer:
+  lang: pt
+  text: dizáiner
+designers:
+  lang: pt
+  text: dizáiners
+destructuring:
+  lang: pt
+  text: destrâcturing
 dev:
   lang: pt
   text: divélopment
@@ -231,6 +327,9 @@ diff:
   lang: pt
   text: dífe
 drift: en
+drizzle:
+  lang: pt
+  text: drízou
 email:
   lang: pt
   text: imêiu
@@ -267,12 +366,21 @@ failure:
 feature:
   lang: pt
   text: fítcher
+fish:
+  lang: pt
+  text: fích
+fixture:
+  lang: pt
+  text: fícstchur
 flag:
   lang: pt
   text: flégui
 flags:
   lang: pt
   text: flégs
+flyer:
+  lang: pt
+  text: fláier
 follow:
   lang: pt
   text: fólou
@@ -294,6 +402,9 @@ grid:
 grpc:
   lang: pt
   text: gê érre pê cê
+gzip:
+  lang: pt
+  text: dji zíp
 handler:
   lang: pt
   text: randler
@@ -303,6 +414,15 @@ hash:
 headquarter:
   lang: pt
   text: redcuórter
+health:
+  lang: pt
+  text: rélth
+hoisting:
+  lang: pt
+  text: róisting
+home:
+  lang: pt
+  text: rôum
 hook:
   lang: pt
   text: ruc
@@ -362,6 +482,9 @@ localStorage:
 lock:
   lang: pt
   text: lóque
+lockfile:
+  lang: pt
+  text: lóc fáil
 log:
   lang: pt
   text: lóg
@@ -395,6 +518,9 @@ migrations:
 mobile:
   lang: pt
   text: môbail
+mtime:
+  lang: pt
+  text: ém táime
 multiprocessing: en
 multithread: en
 networkhub:
@@ -412,6 +538,9 @@ nullable:
 origin:
   lang: pt
   text: óridjin
+overrides:
+  lang: pt
+  text: ôuverráids
 payload:
   lang: pt
   text: pêilôud
@@ -436,9 +565,15 @@ payouts:
 periodType:
   lang: pt
   text: píriod táipe
+pkill:
+  lang: pt
+  text: pê quíl
 platform:
   lang: pt
   text: plátform
+pnpm:
+  lang: pt
+  text: pê ene pê eme
 polling:
   lang: pt
   text: pôulin
@@ -467,6 +602,9 @@ push:
 quantityLimit:
   lang: pt
   text: cuóntiti límit
+radix:
+  lang: pt
+  text: rádiks
 rawInput:
   lang: pt
   text: rô ínput
@@ -500,18 +638,39 @@ rollback:
 runner:
   lang: pt
   text: ránner
+scanner:
+  lang: pt
+  text: escâner
 schema:
   lang: pt
   text: squêma
+schemas:
+  lang: pt
+  text: squímas
+scikit-image:
+  lang: pt
+  text: sáiquit ímidj
 scope:
   lang: pt
   text: scôup
+score:
+  lang: pt
+  text: iscór
 secret:
   lang: pt
   text: sícret
 seed:
   lang: pt
   text: síd
+self-service:
+  lang: pt
+  text: sélf sérvis
+server:
+  lang: pt
+  text: sérver
+serverId:
+  lang: pt
+  text: sérver ái dí
 service:
   lang: pt
   text: sérvis
@@ -521,9 +680,15 @@ session:
 settings:
   lang: pt
   text: sétings
+smoke:
+  lang: pt
+  text: smôuc
 snapshot:
   lang: pt
   text: snépichót
+snapshots:
+  lang: pt
+  text: esnépchóts
 splash:
   lang: pt
   text: espléch
@@ -533,6 +698,9 @@ status:
 string:
   lang: pt
   text: istríng
+sudo:
+  lang: pt
+  text: súdo
 suite:
   lang: pt
   text: suíti
@@ -575,9 +743,15 @@ tooltip:
 tracking:
   lang: pt
   text: tráquin
+tsconfig:
+  lang: pt
+  text: tê ésse cónfig
 typecheck:
   lang: pt
   text: táipetchéc
+types:
+  lang: pt
+  text: táips
 ui:
   lang: pt
   text: u ai
@@ -587,6 +761,9 @@ undefined:
 up:
   lang: pt
   text: áp
+upscale:
+  lang: pt
+  text: ápsquêil
 upsert: en
 user:
   lang: pt
@@ -616,6 +793,9 @@ webhook:
 whitelabel:
   lang: pt
   text: uáit léibou
+window:
+  lang: pt
+  text: uíndou
 wizard:
   lang: pt
   text: uízerd
@@ -628,3 +808,6 @@ workspace:
 worktree:
   lang: pt
   text: uôrktri
+zod:
+  lang: pt
+  text: zód
