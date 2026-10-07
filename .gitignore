@@ -25,3 +25,6 @@ output/
 *.flac
 *.m4a
 *.m3u
+.env
+.tts-md-queue/lock
+.tts-md-queue/seq
