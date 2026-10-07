@@ -42,6 +42,30 @@ def normalize_sample_rate(
     return output_path
 
 
+def probe_duration(path: Path) -> float:
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        raise RuntimeError(
+            "ffprobe not found. Install ffmpeg (with ffprobe) to measure audio duration."
+        )
+    result = subprocess.run(
+        [
+            ffprobe,
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "csv=p=0",
+            str(path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return float(result.stdout.strip())
+
+
 def concat_audio(
     wav_files: list[Path],
     output: Path,

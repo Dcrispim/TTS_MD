@@ -19,6 +19,7 @@ from tts_md.audio.ffmpeg import (
     cleanup_temp,
     concat_audio,
     normalize_sample_rate,
+    probe_duration,
 )
 from tts_md.audio.player import play_audio
 from tts_md.audio.playlist import M3UWriter, slugify, track_name
@@ -55,6 +56,17 @@ def work_dir(label: str) -> Path:
     except FileExistsError:
         path = Path(tempfile.mkdtemp(prefix=f"{name}-", dir=WORK_ROOT))
     return path
+
+
+def line_spans(parts: list[tuple[Path, int]]) -> dict[int, tuple[float, float]]:
+    spans: dict[int, tuple[float, float]] = {}
+    cursor = 0.0
+    for path, line_no in parts:
+        end = cursor + probe_duration(path)
+        start = spans[line_no][0] if line_no in spans else cursor
+        spans[line_no] = (start, end)
+        cursor = end
+    return spans
 
 
 class TTSEngine:
@@ -175,20 +187,30 @@ class TTSEngine:
         *,
         speed: float = 1.0,
     ) -> list[Path]:
+        parts = self.synthesize_blocks_with_lines(blocks, tmp_dir, speed=speed)
+        return [path for path, _ in parts]
+
+    def synthesize_blocks_with_lines(
+        self,
+        blocks: list[SpeechBlock],
+        tmp_dir: Path,
+        *,
+        speed: float = 1.0,
+    ) -> list[tuple[Path, int]]:
         tmp_dir.mkdir(parents=True, exist_ok=True)
-        wav_files: list[Path] = []
+        parts: list[tuple[Path, int]] = []
 
         for index, block in enumerate(blocks, start=1):
             out_path = tmp_dir / f"{index:03d}.wav"
             generated = self.router.synthesize(block, out_path, speed=speed)
-            wav_files.append(generated)
+            parts.append((generated, block.line_no))
 
             if block.pause_after > 0:
                 pause_path = tmp_dir / f"{index:03d}_pause.wav"
                 self._create_silence(pause_path, block.pause_after)
-                wav_files.append(pause_path)
+                parts.append((pause_path, block.line_no))
 
-        return wav_files
+        return parts
 
     def _synthesize_group(
         self,
