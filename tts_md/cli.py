@@ -11,6 +11,7 @@ from tts_md import client
 from tts_md.audio.player import QueuedPlayer, find_player
 from tts_md.audio.playlist import slugify
 from tts_md.engine import TTSEngine, text_label, work_dir
+from tts_md.env import load_dotenv
 from tts_md.lang_index import (
     DEFAULT_INDEX_PATH,
     add_terms,
@@ -288,7 +289,7 @@ def _validate_execution_flags(*, temp: bool, play: bool, output: Path | None) ->
         "synthesis if it does not respond. Also settable via TTS_MD_CHECK."
     ),
 )
-def main(
+def cli(
     input_file: Path | None,
     inline_text: str | None,
     output: Path | None,
@@ -457,6 +458,17 @@ def main(
     click.echo(f"Generated: {final}")
     if keep_temp:
         click.echo(f"Work dir: {work_tmp}")
+
+
+def main() -> None:
+    """Entrypoint do console script.
+
+    O .env e' lido aqui, antes do Click processar os argumentos: os defaults
+    de --host/--port/--check vem de envvar, e o Click le o ambiente durante o
+    parse - carregar depois disso (ja dentro de cli()) chegaria tarde.
+    """
+    load_dotenv()
+    cli(prog_name="tts-md")
 
 
 if __name__ == "__main__":
