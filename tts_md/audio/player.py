@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
 import os
 import queue
 import shutil
+import socket
 import subprocess
 import sys
+import tempfile
 import threading
+import time
 from pathlib import Path
 
 PLAYERS = ("mpv", "aplay", "ffplay")
@@ -90,6 +94,96 @@ def play_audio(path: Path, *, video: bool = False) -> None:
     record_last_played(path)
 
 
+class MpvPlaylist:
+    """Uma janela do mpv para o --stream --video inteiro.
+
+    Cada segmento entra no fim da playlist; se o proximo ainda nao chegou,
+    o --keep-open deixa o video pausado no ultimo quadro ate ele chegar.
+    """
+
+    POLL = 0.2
+
+    def __init__(self, executable: str) -> None:
+        self._dir = Path(tempfile.mkdtemp(prefix="tts-md-mpv-"))
+        sock_path = self._dir / "ipc.sock"
+        self._proc = subprocess.Popen(
+            [
+                executable, "--idle=yes", "--keep-open=yes", "--force-window=no",
+                "--really-quiet", f"--input-ipc-server={sock_path}",
+            ],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        self._sock = self._connect(sock_path)
+        self._reader = self._sock.makefile("rb")
+        self._request = 0
+
+    def _connect(self, sock_path: Path) -> socket.socket:
+        deadline = time.monotonic() + 10
+        while True:
+            if self._proc.poll() is not None:
+                raise RuntimeError("mpv exited before opening its IPC socket")
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            try:
+                sock.connect(str(sock_path))
+                return sock
+            except OSError:
+                sock.close()
+                if time.monotonic() > deadline:
+                    self.close()
+                    raise RuntimeError("timed out waiting for mpv's IPC socket") from None
+                time.sleep(0.05)
+
+    @property
+    def alive(self) -> bool:
+        return self._proc.poll() is None
+
+    def _command(self, *args: object) -> object:
+        self._request += 1
+        request_id = self._request
+        payload = json.dumps({"command": list(args), "request_id": request_id})
+        self._sock.sendall(payload.encode() + b"\n")
+        while True:
+            line = self._reader.readline()
+            if not line:
+                raise RuntimeError("mpv closed the IPC connection")
+            reply = json.loads(line)
+            if reply.get("request_id") != request_id:
+                continue
+            if reply.get("error") != "success":
+                return None
+            return reply.get("data")
+
+    def append(self, path: Path) -> None:
+        self._command("loadfile", str(path.resolve()), "append-play")
+        if self._command("get_property", "eof-reached"):
+            self._command("playlist-next", "weak")
+            self._command("set_property", "pause", False)
+
+    def finished(self) -> bool:
+        if not self.alive or self._command("get_property", "idle-active"):
+            return True
+        pos = self._command("get_property", "playlist-pos")
+        count = self._command("get_property", "playlist-count")
+        return bool(self._command("get_property", "eof-reached")) and pos == (count or 0) - 1
+
+    def wait_and_close(self) -> None:
+        try:
+            while not self.finished():
+                time.sleep(self.POLL)
+            if self.alive:
+                self._command("quit")
+        except (OSError, RuntimeError, ValueError):
+            pass
+        self.close()
+
+    def close(self) -> None:
+        try:
+            self._proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self._proc.kill()
+        shutil.rmtree(self._dir, ignore_errors=True)
+
+
 class QueuedPlayer:
     """Toca faixas em ordem numa thread separada, sem bloquear a sintese.
 
@@ -102,6 +196,9 @@ class QueuedPlayer:
         self._queue: queue.Queue[tuple[Path, bool] | None] = queue.Queue()
         self._thread = threading.Thread(target=self._consume, daemon=True)
         self._started = False
+        self._playlist: MpvPlaylist | None = None
+        self._playlist_closed = False
+        self._playlist_failed = False
 
     def add(self, path: Path, *, video: bool | None = None) -> None:
         if not self._started:
@@ -113,15 +210,43 @@ class QueuedPlayer:
         while True:
             item = self._queue.get()
             if item is None:
+                if self._playlist is not None:
+                    self._playlist.wait_and_close()
                 return
             path, video = item
             try:
+                if self._play_in_window(path, video):
+                    continue
                 play_audio(path, video=video)
             except RuntimeError as exc:
                 # Sem isso uma falha aqui (thread separada, ninguem espera o
                 # resultado por faixa) matava a thread e as proximas faixas da
                 # fila nunca tocavam - e nada avisava.
                 print(f"[tts-md] {exc}", file=sys.stderr)
+
+    def _play_in_window(self, path: Path, video: bool) -> bool:
+        if self._playlist_closed:
+            return True
+        if self._playlist is None:
+            mpv = shutil.which("mpv")
+            if not (video and self._video and mpv) or self._playlist_failed:
+                return False
+            try:
+                self._playlist = MpvPlaylist(mpv)
+            except RuntimeError as exc:
+                self._playlist_failed = True
+                print(f"[tts-md] {exc}; playing each track on its own", file=sys.stderr)
+                return False
+        if not self._playlist.alive:
+            self._playlist_closed = True
+            print("[tts-md] mpv window closed; skipping the remaining tracks", file=sys.stderr)
+            return True
+        try:
+            self._playlist.append(path)
+        except (OSError, ValueError) as exc:
+            raise RuntimeError(f"mpv playlist failed: {exc}") from exc
+        record_last_played(path)
+        return True
 
     def wait(self) -> None:
         """Espera a fila esvaziar e encerra a thread."""
