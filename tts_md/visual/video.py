@@ -188,6 +188,10 @@ def segment(states: list[ScreenState], start: float, end: float) -> list[ScreenS
     return cut
 
 
+def _has_visual(state: ScreenState) -> bool:
+    return bool(state.images or state.code or state.pointer or state.caption)
+
+
 class StreamVideo:
     def __init__(
         self,
@@ -205,6 +209,7 @@ class StreamVideo:
         self.spans: dict[int, tuple[float, float]] = {}
         self.cursor = 0.0
         self.render_warnings: list[str] = []
+        self.last_has_visual = False
 
     def add(self, audio: Path, line_no: int, output: Path) -> Path:
         start = self.cursor
@@ -213,6 +218,7 @@ class StreamVideo:
         self.cursor = end
         timeline = build_timeline(self.extraction.cues, self.spans, self.lines, self.cfg, end)
         states = segment(timeline.states, start, end)
+        self.last_has_visual = any(_has_visual(state) for state in states)
         result = render_video(states, self.images, audio, output, self.cfg, work_dir=self.work_dir)
         _merge(self.render_warnings, result.warnings)
         return result.path

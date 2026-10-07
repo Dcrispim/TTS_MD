@@ -68,9 +68,10 @@ def _command(player: str, executable: str, path: Path, video: bool = False) -> l
 
 
 def play_audio(path: Path, *, video: bool = False) -> None:
-    found = find_player(video=video)
+    needs_video_player = video or path.suffix.lower() == ".mp4"
+    found = find_player(video=needs_video_player)
     if not found:
-        raise RuntimeError(missing_player_message(video=video))
+        raise RuntimeError(missing_player_message(video=needs_video_player))
 
     player, executable = found
     result = subprocess.run(
@@ -98,23 +99,24 @@ class QueuedPlayer:
 
     def __init__(self, *, video: bool = False) -> None:
         self._video = video
-        self._queue: queue.Queue[Path | None] = queue.Queue()
+        self._queue: queue.Queue[tuple[Path, bool] | None] = queue.Queue()
         self._thread = threading.Thread(target=self._consume, daemon=True)
         self._started = False
 
-    def add(self, path: Path) -> None:
+    def add(self, path: Path, *, video: bool | None = None) -> None:
         if not self._started:
             self._thread.start()
             self._started = True
-        self._queue.put(path)
+        self._queue.put((path, self._video if video is None else video))
 
     def _consume(self) -> None:
         while True:
-            path = self._queue.get()
-            if path is None:
+            item = self._queue.get()
+            if item is None:
                 return
+            path, video = item
             try:
-                play_audio(path, video=self._video)
+                play_audio(path, video=video)
             except RuntimeError as exc:
                 # Sem isso uma falha aqui (thread separada, ninguem espera o
                 # resultado por faixa) matava a thread e as proximas faixas da

@@ -91,7 +91,7 @@ def _run_stream(
                     playlist.add(path, track.text)
                 click.echo(f"{path.name}  [{track.lang}] {track.text}")
                 if player is not None:
-                    player.add(path)
+                    player.add(path, video=video is not None and video.last_has_visual)
         finally:
             if player is not None:
                 player.wait()
