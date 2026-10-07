@@ -220,6 +220,14 @@ def _draw_mark(draw, layout: _Layout, y: int, text: str, color) -> None:
     draw.text((text_x, cy), text, font=layout.font, fill=color, anchor="lm")
 
 
+def _lines_label(count: int) -> str:
+    return f"{count} linha" if count == 1 else f"{count} linhas"
+
+
+def _can_override_fonts(fonts) -> bool:
+    return hasattr(fonts, "variable") and isinstance(getattr(fonts, "fonts", None), dict)
+
+
 def render_code(
     cue: CodeCue, view: CodeView, cfg: VideoConfig, frame_size: tuple[int, int]
 ) -> CodeRender:
@@ -241,8 +249,8 @@ def render_code(
     visible = last - first + 1
     shown = lines[first - 1:last]
     longest = max(shown, key=len, default="")
-    top_mark = f"+{first - 1} linhas" if first > 1 else ""
-    bottom_mark = f"+{n - last} linhas" if last < n else ""
+    top_mark = f"+{_lines_label(first - 1)}" if first > 1 else ""
+    bottom_mark = f"+{_lines_label(n - last)}" if last < n else ""
     marks = [t for t in (top_mark, bottom_mark) if t]
     rows = max(1, visible + len(marks))
     number_chars = len(str(max(last, 1)))
@@ -275,6 +283,8 @@ def render_code(
         hl_lines = list(range(lo_hl - first + 1, hi_hl - first + 2))
     hl_color = _premix(cfg.code.highlight, theme.background)
 
+    override_warned: list[bool] = []
+
     def render(lo: _Layout) -> tuple[Image.Image, set[int], int]:
         long_lines, limit = cut_plan(lo)
         formatter = ImageFormatter(
@@ -284,8 +294,12 @@ def render_code(
             image_pad=IMAGE_PAD, line_pad=LINE_PAD, line_number_pad=NUMBER_PAD,
             hl_lines=hl_lines, hl_color=hl_color,
         )
-        formatter.fonts.variable = False
-        formatter.fonts.fonts = {s: _truetype(p, lo.px) for s, p in paths.items()}
+        if _can_override_fonts(formatter.fonts):
+            formatter.fonts.variable = False
+            formatter.fonts.fonts = {s: _truetype(p, lo.px) for s, p in paths.items()}
+        elif not override_warned:
+            override_warned.append(True)
+            warnings.append("Pygments sem FontManager.variable/fonts; usando a resolução de fonte pública")
         buf = io.BytesIO()
         formatter.format(_window_tokens(tokens, first, last, long_lines, limit), buf)
         buf.seek(0)
@@ -312,14 +326,15 @@ def render_code(
         image, long_lines, limit = render(layout)
 
     if height_px < cfg.code.min_font_px:
+        hint = "considere reduzir max_lines" if visible > 1 else "o quadro é baixo demais"
         warnings.append(
-            f"{lang_label}: {visible} linhas → fonte {height_px}px "
-            f"(< min {cfg.code.min_font_px}px); considere reduzir max_lines"
+            f"{lang_label}: {_lines_label(visible)} → fonte {height_px}px "
+            f"(< min {cfg.code.min_font_px}px); {hint}"
         )
     if long_lines:
         warnings.append(f"{lang_label}: {len(long_lines)} linha(s) cortada(s) em {limit + 1} colunas")
-    if image.width > frame_size[0] or image.height > frame_size[1]:
-        scale = min(frame_size[0] / image.width, frame_size[1] / image.height)
+    if image.width > max_w or image.height > max_h:
+        scale = min(max_w / image.width, max_h / image.height)
         size = (max(1, int(image.width * scale)), max(1, int(image.height * scale)))
         warnings.append(
             f"{lang_label}: imagem {image.width}x{image.height} reduzida para "
