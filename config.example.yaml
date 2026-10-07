@@ -28,7 +28,7 @@ voices:
 # diretorio do arquivo real); absolutos e ~ tambem funcionam.
 # video:
 #   size: [1920, 1080]        # largura e altura do video, em pixels
-#   fps: 2                    # quadros por segundo (> 0)
+#   fps: 2                    # grade minima de quadros por segundo (> 0); as trocas seguem a fala (VFR)
 #   background: "#000000"     # cor de fundo
 #   cover: null               # imagem de fundo quando nao ha imagem na tela
 #   fit: contain              # contain (imagem inteira) | cover (preenche e corta)
@@ -37,7 +37,7 @@ voices:
 #   pointer:
 #     image: null             # PNG/SVG customizado; null = seta embutida
 #     size: 48                # tamanho do ponteiro, em pixels
-#     color: "#ff3b30"        # cor da seta embutida
+#     color: "#ff3b30"        # cor da seta embutida (nao vale para pointer.image)
 #     hotspot: [0, 0]         # ponto da imagem que marca o alvo, em pixels
 #   code:
 #     theme: monokai          # estilo do Pygments
@@ -54,5 +54,5 @@ voices:
 #     max_lines: 2
 #     font_px: 36
 #     background: "#000000b0"
-#   upload_max_side: 1280     # lado maximo das imagens enviadas ao --serve
+#   upload_max_side: 1280     # cliente --host: lado maximo das imagens enviadas ao --serve
 #   max_body_mb: 50           # tamanho maximo do corpo da requisicao no --serve

@@ -13,6 +13,8 @@ Pipeline modular que converte Markdown em áudio usando parsers especializados e
 
 Opcional para reprodução: `mpv`, `aplay` ou `ffplay`.
 
+Opcional para o [modo `--video`](#modo---video): o extra `[video]` (Pillow + Pygments).
+
 ## Setup
 
 ```bash
@@ -21,6 +23,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 pip install -e .
+pip install -e '.[video]'   # opcional, só para --video
 
 cp config.example.yaml config.yaml
 # Edite config.yaml com os caminhos dos seus modelos
@@ -43,6 +46,7 @@ tts-md examples/sample.md --debug-parser
 tts-md examples/sample.md --keep-temp
 tts-md examples/sample.md --config config.yaml
 tts-md --text="Chame Payment.approve() antes" --play
+tts-md examples/video.md --video
 ```
 
 Saída padrão: `output/<nome>.wav`
@@ -161,6 +165,222 @@ export TTS_MD_CHECK=1     # opcional, ativa o fallback local
 
 tts-md notas.md   # usa o host/porta/check das envs, sem precisar repetir as flags
 ```
+
+Vídeo pelo servidor (`--serve --video`): veja [Modo `--video` › Servidor e cliente](#servidor-e-cliente).
+
+## Modo `--video`
+
+Em vez de só áudio, gera um **`.mp4`**: a narração continua igual, e a tela mostra imagens,
+um ponteiro, blocos de código com destaque e, opcionalmente, legendas — tudo sincronizado
+com a linha que está sendo falada. As tags que controlam a tela **nunca são faladas**.
+
+```bash
+pip install -e '.[video]'                         # Pillow + Pygments (extra [video])
+tts-md examples/video.md --video                  # → output/video.mp4
+tts-md examples/video.md --video --output aula.mp4
+tts-md notas.md --video --images ~/prints          # refs relativas partem de ~/prints
+tts-md examples/video.md --video --stream          # → output/video/NNN-*.mp4 + playlist.m3u
+tts-md examples/video.md --video --play --temp     # toca no mpv/ffplay e descarta
+```
+
+[`examples/video.md`](examples/video.md) mostra imagem, grupo, ponteiros (px, %, nomeado), código
+com `!{Lx}`/`!{Lx-y}`, `!{clear}` e duração, com as imagens de `examples/images/`.
+
+Requisitos além dos do áudio: o extra `[video]` (sem ele: `--video requires pillow, pygments.
+Install the video extra: pip install 'tts-md[video]'`), o `ffmpeg` (que já é exigido) e,
+só para ponteiro customizado em SVG, um ffmpeg compilado com `librsvg`.
+
+### Tags
+
+| Tag | Efeito |
+| --- | --- |
+| `![[img.png]]` | Mostra a imagem até a próxima imagem, bloco de código visível, `!{clear}` ou heading |
+| `![[img.png\|5s]]` | Idem, mas some 5 s depois da âncora (`s` ou `ms`, ex.: `1.5s`, `500ms`) |
+| `![[a.png]] ![[b.png]]` | Grupo: lado a lado (grade de 2 linhas a partir de 4; aviso acima de 4) |
+| `!{120,340}` | Ponteiro em px da imagem **original** (a última do grupo citada antes do ponteiro) |
+| `!{50%,25%}` | Ponteiro em % da imagem (dá para misturar: `!{50%,120}`) |
+| `!{b.png@120,340}` | Ponteiro numa imagem específica do grupo |
+| `!{120,340\|2s}` | Ponteiro com duração; sem ela, fica até o próximo ponteiro ou a troca de tela |
+| `!{L3}` / `!{L3-5}` | Destaca linhas do bloco de código na tela (1-based, relativas ao bloco); aceita `\|Ns` |
+| `!{clear}` | Limpa a tela (volta ao fundo/`cover`) |
+| ```` ```python !hide ```` | Bloco de código que **não** vai para a tela |
+
+- A referência é um caminho, resolvido com uma base só, sem fallback: o `--images DIR`, se
+  dado; senão o diretório do `.md`; com `--text`, o diretório atual. Absolutos e `~` valem
+  como estão.
+- Uma tag malformada (`!{abc}`, `![[x|5]]`, `!{L0}`) é removida e vira aviso; uma tag sem
+  fechamento (`!{10,20`) continua sendo falada, com aviso.
+- Dentro de código (inline `` `!{clear}` `` ou bloco cercado) a tag é texto comum: nem
+  vira cue nem some — é assim que dá para documentar a sintaxe.
+- Uma tag colada antes de uma cerca (`!{clear}```py`) não é removida (removê-la abriria um
+  bloco de código): a linha é falada como está, com aviso. Tag na cerca de fechamento é
+  ignorada, com aviso.
+- Os avisos vão para o `stderr`, prefixados com `warning:`. Os das tags (`warning: line N: ...`)
+  saem **antes** da síntese. Os da timeline e do render (fonte pequena, grupo grande,
+  ponteiro fora da imagem, legenda cortada, tela visível por menos de 0,5 s) saem no fim,
+  em português (`linha N: ...`, `grupo com ...`, `python: ...`).
+
+### Regras de tempo
+
+- **Âncora:** a posição da tag na linha. Ela é proporcional ao texto: no meio da frase,
+  aponta para o meio do áudio daquela linha. Uma tag sozinha numa linha (sem fala) vale
+  para o início da próxima linha falada — inclusive a imagem logo acima de um `# Título`,
+  que pertence à seção desse heading.
+- **`lead`** (padrão 1 s): a tela aparece esse tanto **antes** da âncora, com piso em 0.
+  Ela nunca entra antes da âncora da tela anterior, e uma tag nunca aparece antes de uma tag
+  anterior no texto.
+- **`group_gap`** (padrão 1 s): imagens cujas âncoras ficam a menos disso uma da outra (em
+  cadeia) formam um grupo e aparecem juntas desde o início. `clear`, heading e código
+  visível quebram o grupo. A duração de um grupo conta a partir da última referência.
+- **Fim de uma tela:** próxima imagem (fora do grupo), bloco de código visível, heading,
+  `!{clear}` ou a duração explícita (`|Ns`, contada da âncora, sem o `lead`).
+
+### Código
+
+Um bloco cercado (sem `!hide`) entra na tela ancorado na primeira linha falada depois
+dele (com o mesmo `lead` das imagens: por padrão, 1 s antes dela) e substitui a imagem. Ele continua mudo no áudio, como sempre.
+
+- Mostra no máximo `code.max_lines` linhas (padrão 60, por linguagem; mínimo 7). Com
+  `!{Lx-y}`, a janela mostra 5 linhas acima do trecho e o resto abaixo, deslocada nas
+  bordas; as linhas cortadas aparecem como `⋯ +N linhas` em cima/embaixo.
+- Números de linha reais, realce do Pygments (`code.theme`, padrão `monokai`; tema
+  inexistente cai no `default` com aviso) e o trecho apontado com uma faixa
+  `code.highlight`. Depois que o destaque expira (`|Ns`), a janela fica onde estava.
+- A fonte é a monoespaçada do sistema (`fc-match monospace`) ou `code.font`, dimensionada
+  para caber; a altura do bloco define o tamanho: abaixo de `code.min_font_px` (14) sai um aviso
+  (reduza `max_lines`). Linhas largas demais não reduzem a fonte abaixo do mínimo: são
+  cortadas com `…`, com um aviso próprio (quebre as linhas longas).
+
+### Legendas
+
+Com `captions.enabled: true`, a linha falada aparece como legenda (sem `#`, ênfase e
+links; código inline fica literal). Acima de `captions.max_lines` linhas, o texto é
+dividido em pedaços que se alternam no tempo, proporcionalmente.
+
+- Uma faixa fixa é **reservada** para a legenda sempre que elas estão ligadas, mesmo nos
+  trechos sem texto (~171 px em 1080p com os padrões), para a imagem e o código não mudarem
+  de tamanho entre estados. A capa (`cover`) continua ocupando o quadro todo.
+- `position: auto` (padrão) põe a legenda embaixo e a sobe quando o ponteiro está na
+  metade de baixo do quadro — por isso, no `auto`, a imagem desce/sobe quando o ponteiro
+  troca de metade. `top`/`bottom` fixam a posição.
+- Se o texto ainda passar de `max_lines` depois da quebra em pixels, é cortado com `…` e
+  aviso.
+
+### Configuração (`video:`)
+
+Seção opcional do config; sem ela valem os defaults. O bloco comentado e explicado está em
+`config.example.yaml`. Resumo:
+
+```yaml
+video:
+  size: [1920, 1080]
+  fps: 2                 # grade mínima de quadros; veja abaixo
+  background: "#000000"
+  cover: null            # fundo quando não há imagem nem código na tela
+  fit: contain           # contain | cover
+  lead: 1.0
+  group_gap: 1.0
+  pointer: {image: null, size: 48, color: "#ff3b30", hotspot: [0, 0]}
+  code:
+    theme: monokai
+    font: null
+    min_font_px: 14
+    highlight: "#ffd60a40"
+    max_lines: {default: 60}   # ex.: {default: 60, tsx: 100}
+  captions: {enabled: false, position: auto, max_lines: 2, font_px: 36, background: "#000000b0"}
+  upload_max_side: 1280  # cliente --host: lado máximo das imagens enviadas
+  max_body_mb: 50        # --serve: corpo máximo da requisição
+```
+
+- Cores em `#rrggbb` ou `#rrggbbaa`. Caminhos relativos (`cover`, `pointer.image`) partem
+  do diretório do arquivo de config (o real, se for symlink).
+- `fps` **não** é a precisão das trocas: o vídeo é VFR e cada troca cai na fronteira exata
+  (quantizada em ~0,04 s pelo ffmpeg); o `fps` só garante um quadro a cada `1/fps` s, para
+  seek e preview.
+- `pointer.color` só vale para a seta embutida. Um `pointer.image` PNG/SVG mantém as cores
+  dele, é escalado para `pointer.size` no maior lado, e o `hotspot` (em px da imagem
+  natural) é o ponto que marca o alvo.
+
+### Saída, `--stream` e `--play`
+
+- `--video` grava `output/<nome>.mp4` (H.264 + AAC, mesma duração do áudio); `--output`
+  precisa terminar em `.mp4`. Com `--temp`, vai para o scratch, como no áudio.
+- Antes de sintetizar qualquer coisa, todas as imagens são abertas; se faltar alguma (ou
+  não for imagem), o comando aborta listando **todas** — nada é sintetizado:
+
+  ```
+  Error: 2 image(s) referenced in the Markdown could not be loaded (relative paths resolve against /home/eu/notas); nothing was synthesized:
+    diagrama.png: not found: /home/eu/notas/diagrama.png
+    quebrada.png: not a readable image: /home/eu/notas/quebrada.png
+  ```
+
+- `--stream --video`: um `.mp4` por linha (os mesmos nomes do `--stream` de áudio) mais
+  um `playlist.m3u` com os `.mp4`. Cada segmento começa com a tela que estava valendo
+  (imagem, ponteiro ou código abertos em linhas anteriores); o `lead` não atravessa
+  segmentos. `--output` é um diretório.
+- `--play --video` toca no `mpv` (com vídeo) ou no `ffplay`. O `aplay` só toca áudio, então
+  é recusado antes da síntese. `--last` reabre um `.mp4` como vídeo.
+
+### Servidor e cliente
+
+Quem liga o vídeo é o operador do servidor, como as outras flags de execução de
+[`--serve`](#servidor-remoto---serve----host):
+
+```bash
+tts-md --serve --video                                   # todo pedido vira output/<slug>.mp4
+tts-md --serve --video --stream --output ~/videos/live   # um diretório de .mp4 por pedido
+
+tts-md examples/video.md --host 192.168.1.50             # o cliente envia as imagens
+tts-md notas.md --host 192.168.1.50 --images ~/prints
+```
+
+- `--serve --video` gera mp4 para **todo** pedido, até sem tags. Exige o extra `[video]`
+  no servidor (e mpv/ffplay com `--play`); `--images` não se aplica ao `--serve`.
+- O servidor **nunca** lê imagens do próprio disco: o cliente resolve as referências no
+  disco dele (mesma base do modo local, `--images` vale com `--host`), aborta localmente
+  se faltar alguma, reduz cada imagem para no máximo `video.upload_max_side` px no maior
+  lado (da config **do cliente**; sem ampliar), recodifica em PNG e envia. O cliente
+  também precisa do extra `[video]`.
+- Isso só acontece quando o texto tem tags `!`; sem tags, o pedido é o mesmo de antes.
+- Servidor sem vídeo (ou de versão antiga): o cliente remove as tags localmente, manda só
+  o texto e avisa `warning: server at H:P has no video support; only the audio will be
+  generated (the ! tags were removed locally)`.
+- O `--video` do cliente não muda o pedido remoto; ele só vale no fallback local do
+  `--check`. Os avisos do render no servidor voltam na resposta e saem no `stderr` do
+  cliente.
+
+Contrato HTTP, para quem integra sem o cliente:
+
+- `GET /health` → `{"status": "ok", "video": true|false}`.
+- `POST /speak`:
+
+  ```json
+  {"text": "![[a.png]] Veja !{50%,50%} aqui.", "lang": null, "speed": 1.0, "persona": null,
+   "images": {"a.png": {"data": "<base64>", "size": [3000, 2000]}}}
+  ```
+
+  A chave de `images` é a referência **literal** do `![[...]]`. `size` é o tamanho
+  original (opcional; sem ele vale o da imagem enviada) e serve para converter as
+  coordenadas em px do ponteiro — por isso uma imagem reduzida no envio aponta para o
+  mesmo lugar. Formatos aceitos: PNG, JPEG, GIF, WEBP, BMP e TIFF; no máximo 16 Mpx por
+  imagem e 64 Mpx somando o pedido; `size` com inteiros de 1 a 100000. Com vídeo, a
+  resposta 200 ganha `"video": true` e `"warnings": [...]`.
+- `400` (antes de enfileirar, nada é sintetizado): referência sem upload ou upload
+  inválido, com `{"error": "...", "missing": {"a.png": "not uploaded"}}`. Também para
+  `Content-Length` inválido ou corpo que não é um objeto JSON. Servidor sem vídeo ignora
+  `images` e só remove as tags.
+- `413`: corpo acima de `video.max_body_mb` (MiB, padrão 50, da config do servidor). Vale
+  para **qualquer** `--serve`, com ou sem vídeo, e é checado pelo `Content-Length`, sem
+  ler o corpo. O cliente vê a conexão fechada e cita o `video.max_body_mb` no erro.
+
+### Limitações conhecidas
+
+- As trocas de tela podem atrasar até ~0,04 s (arredondamento do ffmpeg). Ao extrair
+  quadros, `ffmpeg -ss T` antes do `-i` pode pegar o quadro seguinte perto de uma troca.
+- A imagem/código sempre fica com pelo menos metade do quadro: legenda grande num quadro
+  pequeno volta a sobrepor alguns pixels.
+- Uma mesma imagem repetida num grupo recebe o ponteiro na primeira ocorrência.
+- Uma palavra única mais larga que o quadro, na última linha da legenda, vira só `…`.
 
 ## Personas
 
