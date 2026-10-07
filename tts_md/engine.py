@@ -23,6 +23,7 @@ from tts_md.audio.ffmpeg import (
 from tts_md.audio.player import play_audio
 from tts_md.audio.playlist import M3UWriter, slugify, track_name
 from tts_md.tts.router import TTSRouter
+from tts_md.visual.cues import CueExtraction, extract_cues
 
 SPEAKABLE_RE = re.compile(r"\w", re.UNICODE)
 
@@ -63,6 +64,7 @@ class TTSEngine:
         self._code_parser = CodeBlockParser()
         self._lang_index = LangIndexParser()
         self._table_parser = TableParser()
+        self.last_cues: CueExtraction | None = None
 
     def read_markdown(self, source: Path | str) -> str:
         if isinstance(source, Path):
@@ -79,6 +81,8 @@ class TTSEngine:
         default_lang: str | None = None,
         voice_overrides: dict[str, str] | None = None,
     ) -> list[SpeechBlock]:
+        self.last_cues = extract_cues(text)
+        text = self.last_cues.markdown
         lang = default_lang or self.config.default_lang
         blocks: list[SpeechBlock] = []
         in_code_block = False
