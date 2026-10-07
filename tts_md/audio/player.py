@@ -9,6 +9,7 @@ import threading
 from pathlib import Path
 
 PLAYERS = ("mpv", "aplay", "ffplay")
+VIDEO_PLAYERS = ("mpv", "ffplay")
 
 STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))) / "tts-md"
 LAST_PLAYED_FILE = STATE_DIR / "last_played"
@@ -37,32 +38,43 @@ def get_last_played() -> Path | None:
     return Path(text)
 
 
-def find_player() -> tuple[str, str] | None:
-    for player in PLAYERS:
+def find_player(*, video: bool = False) -> tuple[str, str] | None:
+    for player in VIDEO_PLAYERS if video else PLAYERS:
         executable = shutil.which(player)
         if executable:
             return player, executable
     return None
 
 
-def _command(player: str, executable: str, path: Path) -> list[str]:
+def missing_player_message(*, video: bool = False) -> str:
+    if not video:
+        return "No audio player found. Install mpv, aplay, or ffplay for --play."
+    if shutil.which("aplay"):
+        return (
+            "aplay only plays audio and can't show the video. Install mpv or "
+            "ffplay to use --play with --video."
+        )
+    return "No video player found. Install mpv or ffplay to use --play with --video."
+
+
+def _command(player: str, executable: str, path: Path, video: bool = False) -> list[str]:
     if player == "mpv":
-        return [executable, "--no-video", str(path)]
+        return [executable, str(path)] if video else [executable, "--no-video", str(path)]
     if player == "aplay":
         return [executable, str(path)]
+    if video:
+        return [executable, "-autoexit", str(path)]
     return [executable, "-nodisp", "-autoexit", str(path)]
 
 
-def play_audio(path: Path) -> None:
-    found = find_player()
+def play_audio(path: Path, *, video: bool = False) -> None:
+    found = find_player(video=video)
     if not found:
-        raise RuntimeError(
-            "No audio player found. Install mpv, aplay, or ffplay for --play."
-        )
+        raise RuntimeError(missing_player_message(video=video))
 
     player, executable = found
     result = subprocess.run(
-        _command(player, executable, path),
+        _command(player, executable, path, video),
         capture_output=True,
         text=True,
     )
@@ -84,7 +96,8 @@ class QueuedPlayer:
     seguintes ainda estao sendo geradas.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, video: bool = False) -> None:
+        self._video = video
         self._queue: queue.Queue[Path | None] = queue.Queue()
         self._thread = threading.Thread(target=self._consume, daemon=True)
         self._started = False
@@ -101,7 +114,7 @@ class QueuedPlayer:
             if path is None:
                 return
             try:
-                play_audio(path)
+                play_audio(path, video=self._video)
             except RuntimeError as exc:
                 # Sem isso uma falha aqui (thread separada, ninguem espera o
                 # resultado por faixa) matava a thread e as proximas faixas da

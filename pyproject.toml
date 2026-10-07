@@ -17,6 +17,9 @@ dependencies = [
     "click>=8.1.0",
 ]
 
+[project.optional-dependencies]
+video = ["pillow>=10", "pygments>=2.17,<3"]
+
 [project.scripts]
 tts-md = "tts_md.cli:main"
 
