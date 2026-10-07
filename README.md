@@ -105,6 +105,24 @@ destino é o scratch, não pode ser combinado com `--output`.
 
 Não confundir com `--keep-temp`, que preserva o diretório de trabalho descrito abaixo.
 
+## Repetir o último (`--last`)
+
+`tts-md --last` toca de novo o que foi tocado por último, sem sintetizar nada. Cada
+reprodução guarda uma **cópia** em `~/.local/state/tts-md/last/` (no `--stream`, todos os
+segmentos, em ordem), então funciona mesmo depois que o `/tmp` é limpo ou que um
+`--serve --temp` apaga os arquivos ao fim do pedido. Um `--stream --video` volta na mesma
+janela única do `mpv`; áudio toca sem janela.
+
+Atalho de teclado (ex.: Super+Z no COSMIC), apontando para um script que chama
+`tts-md --config <repo>/config.yaml --last` — em
+`~/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom`:
+
+```ron
+{
+    (modifiers: [Super], key: "z"): Spawn("/home/<você>/.local/bin/tts-md-last"),
+}
+```
+
 ## Diretório de trabalho
 
 Os WAVs intermediários (um por bloco, mais os normalizados do ffmpeg) vão para um
@@ -320,6 +338,11 @@ video:
   segmentos. `--output` é um diretório.
 - `--play --video` toca no `mpv` (com vídeo) ou no `ffplay`. O `aplay` só toca áudio, então
   é recusado antes da síntese. `--last` reabre um `.mp4` como vídeo.
+- `--stream --video --play` com `mpv` usa **uma janela só**: cada segmento entra na
+  playlist dela e, se o próximo ainda não chegou, o vídeo fica pausado no último quadro.
+  A janela só abre no primeiro segmento com algo na tela (imagem, código, ponteiro ou
+  legenda) — os anteriores tocam só o áudio — e fecha ao fim do último. Com `ffplay`, é
+  um player por segmento, e os sem nada na tela tocam com `-nodisp`.
 
 ### Servidor e cliente
 

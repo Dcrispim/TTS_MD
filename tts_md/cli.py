@@ -13,9 +13,10 @@ from tts_md import client, persona
 from tts_md.audio.player import (
     QueuedPlayer,
     find_player,
-    get_last_played,
+    get_last_run,
     missing_player_message,
     play_audio,
+    replay,
 )
 from tts_md.audio.playlist import M3UWriter, slugify
 from tts_md.engine import TTSEngine, text_label, work_dir
@@ -570,18 +571,15 @@ def main(
             raise click.ClickException(
                 "No audio player found. Install mpv, aplay, or ffplay for --last."
             )
-        last_path = get_last_played()
-        if last_path is None:
+        last_files = get_last_run()
+        if not last_files:
             raise click.ClickException("No previously played audio found.")
-        if not last_path.exists():
-            # Comum quando o ultimo audio veio de --temp: o SO ja pode ter
-            # limpo o diretorio de scratch (reboot, systemd-tmpfiles, etc.).
-            raise click.ClickException(
-                f"The last played audio no longer exists: {last_path}"
-            )
-        click.echo(f"Replaying: {last_path}")
+        if len(last_files) == 1:
+            click.echo(f"Replaying: {last_files[0]}")
+        else:
+            click.echo(f"Replaying {len(last_files)} tracks from {last_files[0].parent}")
         try:
-            play_audio(last_path, video=last_path.suffix.lower() == ".mp4")
+            replay(last_files)
         except RuntimeError as exc:
             raise click.ClickException(str(exc)) from exc
         return
