@@ -1,0 +1,81 @@
+# Idioma de leitura por termo. Editavel a mao ou via `tts-md --add-term`.
+#
+#   termo: en                        # so o idioma
+#   dev: {lang: en, text: development}  # idioma + o que falar no lugar
+#
+# Idiomas aceitos: pt, en (ou pt-BR, en-US). Termos sao case-insensitive.
+'@icv': en
+API: pt
+Account: en
+DTO:
+  lang: pt
+  text: dê tê ó
+IncentPay: 
+  lang: pt
+  text: incent pei
+PostHog: 
+  lang: pt
+  text: pôst róg
+adapter: en
+alias: 
+  lang: pt
+  text: êlias
+approve: 
+  lang: pt
+  text: apruve
+arquivo: pt
+assert: en
+awards: en
+baseline: en
+branch: en
+checkout: en
+commit: en
+configuração: pt
+controller: en
+deploy: en
+dev:
+  lang: en
+  text: development
+development: en
+endpoint: en
+errorCode: en
+errors: en
+gateway: en
+grpc:
+  lang: pt
+  text: gê érre pê cê
+handler: en
+headquarter: en
+import: en
+leader: en
+leaderboard: en
+leaderboards: en
+lint: en
+log: en
+message: en
+metadata: en
+npm:
+  lang: pt
+  text: ene pê eme
+nullable: en
+origin: en
+payload: en
+payment: en
+paymentBatch: en
+paymentBatches: en
+payments: en
+payout: en
+payouts: en
+platform: en
+product: en
+rollback: en
+swagger: en
+tier: en
+typecheck:
+  lang: en
+  text: type check
+usuário: pt
+wizard: en
+worker: en
+workspace: en
+worktree: en

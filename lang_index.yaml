@@ -6,40 +6,109 @@
 # Idiomas aceitos: pt, en (ou pt-BR, en-US). Termos sao case-insensitive.
 '@icv': en
 API: pt
+AST:
+  lang: en
+  text: êi-és-tí
 Account:
   lang: pt
   text: acáunt
 Atlassian: en
+AwardInfo:
+  lang: pt
+  text: auórd ínfo
+BankInstitution:
+  lang: pt
+  text: bénk institiúchon
+CPF:
+  lang: pt
+  text: cê pê éfe
+CatalogAwardConfig:
+  lang: pt
+  text: cátalog auórd cónfig
+Context:
+  lang: pt
+  text: cóntext
+CpfLog:
+  lang: pt
+  text: cê pê éfe lóg
 Cypress:
   lang: pt
   text: sáiprés
 DTO:
   lang: pt
   text: dê tê ó
+DTOs:
+  lang: pt
+  text: dê tê ós
+GitHub: en
 HQ:
   lang: pt
   text: agá cu
+HTTPS:
+  lang: pt
+  text: agá tê tê pê ésse
+Hurl:
+  lang: pt
+  text: rârl
 IncentPay:
   lang: pt
   text: incent pei
+JSON:
+  lang: pt
+  text: djêisson
 Jest:
   lang: pt
   text: djérst
+Keycloak:
+  lang: pt
+  text: quícloque
+LimitConfig:
+  lang: pt
+  text: límit cónfig
 MCP:
   lang: pt
   text: eme cê pê
+Nx:
+  lang: pt
+  text: éne xis
+PIX: pt
+  lang: pt
+  text: píx
 PR:
   lang: en
   text: pull request
+PicPay:
+  lang: pt
+  text: píc pêi
 PostHog:
   lang: pt
   text: pôst róg
+Purchase:
+  lang: pt
+  text: pârtchas
+REST: en
+RabbitMQ: en
+SLA:
+  lang: pt
+  text: ésse éle á
+SendGrid:
+  lang: pt
+  text: sénd grid
 StarkBank:
   lang: pt
   text: estárk bénk
+TED:
+  lang: pt
+  text: tédi
+Vitest:
+  lang: pt
+  text: vaitést
 adapter:
   lang: pt
   text: adápter
+admin:
+  lang: pt
+  text: adimín
 alias:
   lang: pt
   text: êlias
@@ -50,9 +119,17 @@ arquivo: pt
 assert:
   lang: pt
   text: assért
+assignee: en
+auth:
+  lang: pt
+  text: ót
 awards:
   lang: pt
   text: auórdz
+backend:
+  lang: pt
+  text: béquend
+backfill: en
 baseline:
   lang: pt
   text: béisláin
@@ -65,6 +142,9 @@ blockedAt:
 blockedMessage:
   lang: pt
   text: blóqued méssidj
+board:
+  lang: pt
+  text: bórd
 branch:
   lang: pt
   text: brantch
@@ -74,6 +154,9 @@ bug:
 bugs:
   lang: pt
   text: bágues
+build:
+  lang: pt
+  text: bíld
 buy:
   lang: pt
   text: bái
@@ -83,9 +166,27 @@ cache:
 caching:
   lang: pt
   text: quéchin
+callback:
+  lang: pt
+  text: cólbéqui
+card:
+  lang: pt
+  text: cárd
+catalog:
+  lang: pt
+  text: cátalog
+checklist:
+  lang: pt
+  text: tchéc list
 checkout:
   lang: pt
   text: tchécaut
+client:
+  lang: pt
+  text: cláient
+cluster:
+  lang: pt
+  text: clâster
 commit:
   lang: pt
   text: comít
@@ -114,30 +215,82 @@ deploy:
 dev:
   lang: pt
   text: divélopment
+devServerTarget:
+  lang: pt
+  text: dév sérver tárguet
 development:
   lang: pt
   text: divélopment
+dialog:
+  lang: pt
+  text: dáialog
 dict:
   lang: pt
   text: dícti
+diff:
+  lang: pt
+  text: dífe
+drift: en
 email:
   lang: pt
   text: imêiu
+enabled:
+  lang: pt
+  text: inêibold
 endpoint:
   lang: pt
   text: êndpoint
+endpoints:
+  lang: pt
+  text: êndpoints
+enum:
+  lang: pt
+  text: ênum
+env:
+  lang: pt
+  text: énv
 errorCode:
   lang: pt
   text: érrorcôud
 errors:
   lang: pt
   text: érrors
+executor:
+  lang: pt
+  text: ezécutor
+export:
+  lang: pt
+  text: écsport
+failure:
+  lang: pt
+  text: fêiliur
+feature:
+  lang: pt
+  text: fítcher
+flag:
+  lang: pt
+  text: flégui
+flags:
+  lang: pt
+  text: flégs
+follow:
+  lang: pt
+  text: fólou
+form:
+  lang: pt
+  text: fôrm
+frontend:
+  lang: pt
+  text: frôntend
 gap:
   lang: pt
   text: gáp
 gateway:
   lang: pt
   text: guêituei
+grid:
+  lang: pt
+  text: gríd
 grpc:
   lang: pt
   text: gê érre pê cê
@@ -153,19 +306,38 @@ headquarter:
 hook:
   lang: pt
   text: ruc
+hot reload:
+  lang: pt
+  text: rót riloud
 identify:
   lang: pt
   text: aidentifái
+impact:
+  lang: pt
+  text: ímpact
 import:
   lang: pt
   text: impórt
 input:
   lang: pt
   text: ínput
+invalidOwnership:
+  lang: pt
+  text: inválid ôunerchip
 issue: en
 job:
   lang: pt
   text: djób
+jobs:
+  lang: pt
+  text: djóbs
+kid:
+  lang: pt
+  text: quíd
+kind: en
+layout:
+  lang: pt
+  text: lêiaut
 leader:
   lang: pt
   text: líder
@@ -175,18 +347,54 @@ leaderboard:
 leaderboards:
   lang: pt
   text: líderbords
+ledger:
+  lang: pt
+  text: lédjer
+link:
+  lang: pt
+  text: línk
 lint:
   lang: pt
   text: lint
+localStorage:
+  lang: pt
+  text: lôcau estóridj
+lock:
+  lang: pt
+  text: lóque
 log:
   lang: pt
   text: lóg
+login:
+  lang: pt
+  text: lóguin
+mapper:
+  lang: pt
+  text: mépper
+mapping:
+  lang: pt
+  text: mépin
+merge:
+  lang: pt
+  text: mérdj
+mergeada:
+  lang: pt
+  text: mérdjada
 message:
   lang: pt
   text: méssidj
 metadata:
   lang: pt
   text: métadeita
+migration:
+  lang: pt
+  text: maigrêichon
+migrations:
+  lang: pt
+  text: maigrêichons
+mobile:
+  lang: pt
+  text: môbail
 multiprocessing: en
 multithread: en
 networkhub:
@@ -225,27 +433,145 @@ payout:
 payouts:
   lang: pt
   text: pêiauts
+periodType:
+  lang: pt
+  text: píriod táipe
 platform:
   lang: pt
   text: plátform
+polling:
+  lang: pt
+  text: pôulin
+preview:
+  lang: pt
+  text: prívíu
 product:
   lang: pt
   text: pródact
+project:
+  lang: pt
+  text: pródject
+proto:
+  lang: pt
+  text: prôto
+provider:
+  lang: pt
+  text: prováider
+proxy:
+  lang: pt
+  text: próxi
+pull: en
+push:
+  lang: pt
+  text: púch
+quantityLimit:
+  lang: pt
+  text: cuóntiti límit
+rawInput:
+  lang: pt
+  text: rô ínput
+realm:
+  lang: pt
+  text: rélm
+rebase: en
+redirect:
+  lang: pt
+  text: ridirécti
+refactor: en
+refresh:
+  lang: pt
+  text: rifréch
+renewDay:
+  lang: pt
+  text: rinú dêi
+request: en
+reset:
+  lang: pt
+  text: rissét
+review:
+  lang: pt
+  text: revíu
 role:
   lang: pt
   text: rôul
 rollback:
   lang: pt
   text: rôlbác
+runner:
+  lang: pt
+  text: ránner
+schema:
+  lang: pt
+  text: squêma
+scope:
+  lang: pt
+  text: scôup
+secret:
+  lang: pt
+  text: sícret
+seed:
+  lang: pt
+  text: síd
+service:
+  lang: pt
+  text: sérvis
+session:
+  lang: pt
+  text: séchon
+settings:
+  lang: pt
+  text: sétings
+snapshot:
+  lang: pt
+  text: snépichót
+splash:
+  lang: pt
+  text: espléch
+status:
+  lang: pt
+  text: istêitus
+string:
+  lang: pt
+  text: istríng
+suite:
+  lang: pt
+  text: suíti
+suites:
+  lang: pt
+  text: suítis
 swagger:
   lang: pt
   text: suáguer
+switch:
+  lang: pt
+  text: suítchi
+sync:
+  lang: pt
+  text: síngk
+tag:
+  lang: pt
+  text: tégui
+template:
+  lang: pt
+  text: têmplêit
+templates:
+  lang: pt
+  text: têmplêits
 ticket:
   lang: pt
   text: tíquet
 tier:
   lang: pt
   text: tíer
+toggle:
+  lang: pt
+  text: tôgou
+token:
+  lang: pt
+  text: tôuquen
+tooltip:
+  lang: pt
+  text: túltip
 tracking:
   lang: pt
   text: tráquin
@@ -258,6 +584,10 @@ ui:
 undefined:
   lang: pt
   text: andifáind
+up:
+  lang: pt
+  text: áp
+upsert: en
 user:
   lang: pt
   text: iúzer
@@ -265,7 +595,27 @@ usuário: pt
 uuid:
   lang: pt
   text: u u ai dê
+valueLimit:
+  lang: pt
+  text: válio límit
+view: en
+vite:
+  lang: pt
+  text: vít
+voucher:
+  lang: pt
+  text: váutcher
+vouchers:
+  lang: pt
+  text: váutchers
 wake word: en
+warning: en
+webhook:
+  lang: pt
+  text: uébi rúc
+whitelabel:
+  lang: pt
+  text: uáit léibou
 wizard:
   lang: pt
   text: uízerd

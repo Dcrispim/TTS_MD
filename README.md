@@ -162,6 +162,22 @@ export TTS_MD_CHECK=1     # opcional, ativa o fallback local
 tts-md notas.md   # usa o host/porta/check das envs, sem precisar repetir as flags
 ```
 
+As mesmas variáveis podem ficar num arquivo `.env` **na raiz do projeto**, se você
+prefere não mexer no perfil do shell. O prefixo `TTS_MD_` é opcional ali:
+
+```bash
+# TTS_MD/.env
+HOST=192.168.1.50
+PORT=8420
+CHECK=1
+```
+
+Só o `.env` da raiz do TTS_MD é lido — nunca o do diretório de onde você chamou o
+comando, já que `HOST` é um nome comum demais em `.env` de aplicação e um
+`tts-md` rodado dentro de outro projeto acabaria mandando o áudio pro host dele.
+O que estiver exportado no shell, e as flags da linha de comando, continuam
+ganhando do arquivo.
+
 ## Índice de idioma por termo
 
 `lang_index.yaml` diz em que idioma cada termo deve ser lido. O que não está no índice
