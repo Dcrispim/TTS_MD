@@ -1,15 +1,23 @@
 from __future__ import annotations
 
+import base64
+import binascii
+import io
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from tts_md.audio.ffmpeg import probe_duration
 from tts_md.models import VideoConfig
 from tts_md.visual.cues import CueExtraction, CueWarning, ImageCue
 from tts_md.visual.render import ImageSource, render_video
 from tts_md.visual.timeline import ScreenState, build_timeline
+
+MAX_UPLOAD_PIXELS = 16_000_000
+MAX_REQUEST_PIXELS = 64_000_000
+MAX_SIZE_SIDE = 100_000
+UPLOAD_FORMATS = ("PNG", "JPEG", "GIF", "WEBP", "BMP", "TIFF")
 
 
 @dataclass
@@ -44,6 +52,92 @@ class FileSystemResolver:
                 continue
             result.images[ref] = ImageSource(path)
         return result
+
+
+class UploadResolver:
+    def __init__(self, uploads: object) -> None:
+        self.uploads = uploads if isinstance(uploads, dict) else {}
+
+    def resolve(self, refs: list[str]) -> Resolution:
+        result = Resolution()
+        total = 0
+        for ref in dict.fromkeys(refs):
+            if ref not in self.uploads:
+                result.missing[ref] = "not uploaded"
+                continue
+            try:
+                source, pixels = _decode_upload(self.uploads[ref], MAX_REQUEST_PIXELS - total)
+            except ValueError as exc:
+                result.missing[ref] = str(exc)
+                continue
+            total += pixels
+            result.images[ref] = source
+        return result
+
+
+def _decode_upload(entry: object, budget: int) -> tuple[ImageSource, int]:
+    if not isinstance(entry, dict) or not isinstance(entry.get("data"), str):
+        raise ValueError("upload must be an object with a base64 'data' string")
+    try:
+        data = base64.b64decode(entry["data"], validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("invalid base64 in 'data'") from exc
+    size = entry.get("size")
+    if size is not None:
+        if (
+            not isinstance(size, list)
+            or len(size) != 2
+            or not all(
+                isinstance(v, int) and not isinstance(v, bool) and 0 < v <= MAX_SIZE_SIDE
+                for v in size
+            )
+        ):
+            raise ValueError(
+                f"'size' must be [width, height] with integers between 1 and {MAX_SIZE_SIDE}"
+            )
+        size = (size[0], size[1])
+    try:
+        with Image.open(io.BytesIO(data), formats=UPLOAD_FORMATS) as image:
+            width, height = image.size
+            pixels = width * height
+            if pixels > MAX_UPLOAD_PIXELS:
+                raise ValueError(
+                    f"image is {width}x{height} ({pixels:,} px), "
+                    f"above the {MAX_UPLOAD_PIXELS:,} px per-image limit"
+                )
+            if pixels > budget:
+                raise ValueError(
+                    f"image is {width}x{height} ({pixels:,} px) and the request "
+                    f"would exceed the {MAX_REQUEST_PIXELS:,} px total limit"
+                )
+            image.verify()
+    except Image.DecompressionBombError as exc:
+        raise ValueError(f"image above the {MAX_UPLOAD_PIXELS:,} px per-image limit") from exc
+    except (OSError, SyntaxError, UnidentifiedImageError) as exc:
+        raise ValueError(
+            f"not a readable image (accepted formats: {', '.join(UPLOAD_FORMATS)})"
+        ) from exc
+    return ImageSource(data, size), pixels
+
+
+def encode_upload(source: ImageSource, max_side: int) -> dict:
+    raw = source.data if isinstance(source.data, Path) else io.BytesIO(source.data)
+    with Image.open(raw) as opened:
+        image = ImageOps.exif_transpose(opened)
+        size = source.size or image.size
+        if max(image.size) > max_side:
+            if image.mode not in ("L", "LA", "RGB", "RGBA"):
+                image = image.convert("RGBA")
+            scale = max_side / max(image.size)
+            image = image.resize(
+                (max(1, round(image.width * scale)), max(1, round(image.height * scale))),
+                Image.LANCZOS,
+            )
+        if image.mode not in ("1", "L", "LA", "P", "RGB", "RGBA"):
+            image = image.convert("RGBA")
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+    return {"data": base64.b64encode(buffer.getvalue()).decode("ascii"), "size": list(size)}
 
 
 def image_refs(extraction: CueExtraction) -> list[str]:

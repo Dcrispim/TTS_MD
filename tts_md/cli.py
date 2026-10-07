@@ -28,9 +28,9 @@ from tts_md.lang_index import (
     lookup_term,
     parse_spec,
 )
-from tts_md.models import AppConfig
+from tts_md.models import AppConfig, VideoConfig
 from tts_md.server import DEFAULT_PORT, ServeOptions, run_server
-from tts_md.visual import VideoDepsError, require_video_deps
+from tts_md.visual import VideoDepsError, extract_cues, require_video_deps
 from tts_md.voices import VoiceLangMismatch, check_voice_lang
 
 if TYPE_CHECKING:
@@ -109,11 +109,15 @@ def _echo_warnings(warnings: list[str]) -> None:
         click.echo(f"warning: {warning}", err=True)
 
 
-def _prepare_video(extraction: CueExtraction, base: Path, *, play: bool) -> dict:
+def _require_video_deps() -> None:
     try:
         require_video_deps()
     except VideoDepsError as exc:
         raise click.ClickException(str(exc)) from exc
+
+
+def _prepare_video(extraction: CueExtraction, base: Path, *, play: bool) -> dict:
+    _require_video_deps()
     from tts_md.visual.video import FileSystemResolver, format_warning, image_refs
 
     if play and find_player(video=True) is None:
@@ -128,6 +132,20 @@ def _prepare_video(extraction: CueExtraction, base: Path, *, play: bool) -> dict
         )
     _echo_warnings([format_warning(w) for w in extraction.warnings])
     return resolution.images
+
+
+def _video_uploads(
+    extraction: CueExtraction, base: Path, config_path: Path | None
+) -> dict[str, dict]:
+    images = _prepare_video(extraction, base, play=False)
+    from tts_md.visual.video import encode_upload
+
+    cfg_path = config_path or AppConfig.default_path()
+    video_cfg = AppConfig.load(cfg_path).video if cfg_path.exists() else VideoConfig()
+    try:
+        return {ref: encode_upload(src, video_cfg.upload_max_side) for ref, src in images.items()}
+    except (OSError, ValueError) as exc:
+        raise click.ClickException(f"Could not prepare the images for upload: {exc}") from exc
 
 
 def _manage_index(
@@ -263,7 +281,7 @@ def _run_video(
     voice_overrides: dict[str, str],
     config: AppConfig,
     images: dict,
-) -> None:
+) -> list[str]:
     from tts_md.visual.video import render_document
 
     spans: dict[int, tuple[float, float]] = {}
@@ -295,6 +313,7 @@ def _run_video(
             play_audio(output, video=True)
         except RuntimeError as exc:
             raise click.ClickException(str(exc)) from exc
+    return warnings
 
 
 @click.command()
@@ -601,10 +620,12 @@ def main(
         )
         return
 
-    if images_dir is not None and not video:
-        raise click.ClickException("--images only applies to --video.")
-    if video and serve:
-        raise click.ClickException("--video is not supported with --serve yet.")
+    if images_dir is not None and serve:
+        raise click.ClickException(
+            "--images doesn't apply to --serve: the images come uploaded with each request."
+        )
+    if images_dir is not None and not video and not host:
+        raise click.ClickException("--images only applies to --video or --host.")
 
     if serve:
         if input_file is not None or inline_text is not None:
@@ -623,9 +644,18 @@ def main(
             if not shutil.which("ffmpeg"):
                 raise click.ClickException("ffmpeg is required but was not found in PATH.")
             config.validate()
+        if video:
+            _require_video_deps()
+            if play and find_player(video=True) is None:
+                raise click.ClickException(missing_player_message(video=True))
 
         opts = ServeOptions(
-            play=play, stream=stream, temp=temp, output=output, keep_temp=keep_temp
+            play=play,
+            stream=stream,
+            temp=temp,
+            output=output,
+            keep_temp=keep_temp,
+            video=video,
         )
         run_server(config, opts, host or "0.0.0.0", port)
         return
@@ -640,11 +670,6 @@ def main(
         )
     if check and not host:
         raise click.ClickException("--check only applies to --host.")
-    if video and host and not debug_parser:
-        raise click.ClickException(
-            "--video is not supported with --host yet; drop --host (or unset "
-            "TTS_MD_HOST) to render the video locally."
-        )
     if speed <= 0:
         raise click.ClickException("--speed must be greater than 0.")
 
@@ -671,8 +696,8 @@ def main(
     # sem isso um host inalcancavel mas roteavel deixaria send_to_server preso
     # no timeout de sintese (300s) so pra descobrir que ninguem responde.
     if host and not debug_parser:
-        reachable = client.check_server(host, port)
-        if not reachable:
+        health = client.server_health(host, port)
+        if health is None:
             if not check:
                 raise click.ClickException(
                     f"Server at {host}:{port} did not respond. Pass --check to "
@@ -684,20 +709,38 @@ def main(
                 err=True,
             )
         else:
+            remote_text, uploads = markdown, None
+            extraction = extract_cues(markdown)
+            has_tags = extraction.markdown != markdown
+            server_video = health.get("video") is True
+            if has_tags and server_video:
+                base = input_file.resolve().parent if input_file is not None else Path.cwd()
+                uploads = _video_uploads(extraction, images_dir or base, config_path)
+            elif not server_video and (has_tags or video):
+                if has_tags:
+                    remote_text = extraction.markdown
+                click.echo(
+                    f"warning: server at {host}:{port} has no video support; only "
+                    "the audio will be generated"
+                    + (" (the ! tags were removed locally)" if has_tags else ""),
+                    err=True,
+                )
             try:
                 result = client.send_to_server(
                     host,
                     port,
-                    markdown,
+                    remote_text,
                     lang=lang,
                     speed=speed,
                     persona=resolved_persona_for_host,
+                    images=uploads,
                 )
             except client.ServerError as exc:
                 if not check:
                     raise click.ClickException(str(exc)) from exc
                 click.echo(f"warning: {exc}; falling back to local TTS", err=True)
             else:
+                _echo_warnings(result.warnings)
                 click.echo(f"Handled by {host}:{port}: {result.output}")
                 return
 
