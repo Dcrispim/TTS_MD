@@ -9,6 +9,7 @@ from tts_md.visual.cues import (
     PointerCue,
     extract_cues,
 )
+from tts_md.visual.deps import VideoDepsError, require_video_deps
 
 __all__ = [
     "ClearCue",
@@ -19,5 +20,7 @@ __all__ = [
     "ImageCue",
     "LinePointerCue",
     "PointerCue",
+    "VideoDepsError",
     "extract_cues",
+    "require_video_deps",
 ]

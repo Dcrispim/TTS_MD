@@ -19,3 +19,40 @@ voices:
   en-US:
     engine: kokoro
     voice: af_bella
+
+# Opcional. Usado so pelo modo --video; sem esta secao valem os defaults
+# abaixo. Requer o extra de video: pip install 'tts-md[video]'
+# Cores aceitam #rrggbb ou #rrggbbaa (aa = transparencia).
+# Caminhos relativos (cover, pointer.image) partem do diretorio deste arquivo
+# de config, nao do diretorio atual (se o config for um symlink, a base e o
+# diretorio do arquivo real); absolutos e ~ tambem funcionam.
+# video:
+#   size: [1920, 1080]        # largura e altura do video, em pixels
+#   fps: 2                    # quadros por segundo (> 0)
+#   background: "#000000"     # cor de fundo
+#   cover: null               # imagem de fundo quando nao ha imagem na tela
+#   fit: contain              # contain (imagem inteira) | cover (preenche e corta)
+#   lead: 1.0                 # segundos que a tela antecipa a fala (>= 0)
+#   group_gap: 1.0            # referencias com intervalo menor que isto formam um grupo (>= 0)
+#   pointer:
+#     image: null             # PNG/SVG customizado; null = seta embutida
+#     size: 48                # tamanho do ponteiro, em pixels
+#     color: "#ff3b30"        # cor da seta embutida
+#     hotspot: [0, 0]         # ponto da imagem que marca o alvo, em pixels
+#   code:
+#     theme: monokai          # estilo do Pygments
+#     font: null              # null = fonte monoespacada do sistema
+#     min_font_px: 14         # abaixo disto o render emite um aviso
+#     highlight: "#ffd60a40"  # cor do destaque das linhas apontadas
+#     max_lines:              # linhas visiveis por bloco de codigo (>= 7)
+#       default: 60
+#       # tsx: 100            # por linguagem (info string do fence, sem diferenciar maiusculas)
+#       # python: 50
+#   captions:
+#     enabled: false          # legendas com o texto falado
+#     position: auto          # auto | top | bottom
+#     max_lines: 2
+#     font_px: 36
+#     background: "#000000b0"
+#   upload_max_side: 1280     # lado maximo das imagens enviadas ao --serve
+#   max_body_mb: 50           # tamanho maximo do corpo da requisicao no --serve
