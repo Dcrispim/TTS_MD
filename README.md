@@ -105,6 +105,74 @@ destino é o scratch, não pode ser combinado com `--output`.
 
 Não confundir com `--keep-temp`, que preserva o diretório de trabalho descrito abaixo.
 
+## Livros e leitura em partes (`--epub`/`--book`, `--track`, `--start`)
+
+```bash
+tts-md --epub livro.epub --track   # lê o livro, salvando onde parou
+tts-md --epub livro.epub           # dias depois: continua do mesmo parágrafo
+tts-md --epub livro.epub --start   # ignora o progresso e recomeça do início
+tts-md notas.md --track            # também vale para Markdown
+tts-md --epub livro.epub --track 3 # retoma 3 blocos antes de onde parou
+```
+
+- `--epub` converte o EPUB para Markdown só com a biblioteca padrão: um parágrafo por
+  linha, títulos como `#`, na ordem do *spine*. Notas de rodapé e suas chamadas
+  (`<sup>`, `epub:type="noteref"`), imagens, quebras de página e o sumário de navegação
+  ficam de fora. Uma cópia do Markdown fica em `~/.local/state/tts-md/epub/<livro>.md`
+  para conferência. Implica `--play`.
+- Livros são sempre lidos em **pt-BR**, independente do `default_lang` do config e do
+  idioma declarado no EPUB. Para outro idioma, passe `--lang` (ex.: `--lang en-US`).
+- `--book` é sinônimo de `--epub` e aceita outros formatos: AZW3, MOBI, FB2 e KFX **sem
+  DRM** passam antes pelo `ebook-convert` do Calibre e viram um EPUB em cache
+  (`~/.local/state/tts-md/book-cache/`), convertido de novo só se o arquivo mudar. KFX
+  exige o plugin *KFX Input* no Calibre. Livros comprados na Amazon têm DRM e não são
+  lidos: o erro diz isso explicitamente.
+- Livros gerados de PDF às vezes trazem um espaço depois de todo "m"/"j" ("tom ei",
+  "cam inhei", "j ogada"). Quando o livro tem esse defeito, a conversão junta os pedaços
+  que formam palavra no dicionário hunspell `pt_BR` (procurado em
+  `~/.local/share/hunspell/` e `/usr/share/hunspell/`). Pares curtos ambíguos ("com o",
+  "tem a") ficam como estão. Sem dicionário ou sem o defeito, o texto não é alterado.
+- `--track` grava a posição em `~/.local/state/tts-md/tracks/<arquivo>-<hash>.json` a
+  cada bloco (linha/parágrafo) que **começa** a tocar, então uma interrupção retoma do
+  início do parágrafo interrompido. Implica `--play`. Com um número (`--track 3`), a
+  retomada volta essa quantidade de blocos antes da posição salva, para relembrar o contexto.
+- Ler um arquivo com `--play` **sempre** consulta esse progresso: se existir, continua de
+  onde parou e segue atualizando, mesmo sem `--track`. Lido até o fim, a próxima leitura
+  recomeça do começo. Se o arquivo mudou, o parágrafo salvo é procurado pelo texto.
+- `--start` ignora o progresso salvo e reinicia o acompanhamento do zero.
+
+Enquanto lê, um bloco é tocado enquanto os próximos (até 3) são sintetizados, e o áudio
+é descartado depois de tocado. Teclas: **espaço**/**p** pausa e continua, **n** pula o
+bloco, **s** pula para a próxima seção (útil para passar o sumário), **q** para. Seção é
+cada documento interno do livro (capítulo, sumário, prefácio...) ou um título `#`; num
+Markdown, só os títulos. Ctrl+C (exit 130), fechar o terminal (SIGHUP, 129) e `kill`
+(SIGTERM, 143) também param o player e deixam o progresso salvo. A leitura é sempre
+local (ignora `--host`) e não combina com `--stream`, `--video`, `--output` ou `--temp`.
+
+### Plugins por tipo de livro (`--plugins`)
+
+Ajustes que só fazem sentido para um tipo de livro, obra ou autor ficam isolados em
+`tts_md/plugins/<pacote>/` e não entram na base geral. **Nada roda sozinho**: os plugins
+são pedidos explicitamente na leitura e aplicados nessa ordem a cada bloco (parágrafo),
+que volta com o texto final. Uma linha continua uma linha, então seções e `--track` não
+se deslocam.
+
+```bash
+tts-md --book livro.azw3 --track --plugins novel-dialogue   # vírgula ou repetir a flag p/ vários
+tts-md --list-plugins                                       # slug<TAB>descrição (o biblio usa)
+```
+
+- **`novel-dialogue`** (light novels traduzidas por fãs, ex.: *Tensei Shitara Slime*): o
+  nome entre parênteses no fim da fala vira verbo + nome, para não ficar "solto" em voz
+  alta — `「…responder?」 (Mensageiro)` → "…responder? perguntou Mensageiro",
+  `(…pensamento…) (Gazelle)` → "pensou Gazelle", `(???)` → "alguém". Também
+  "– fala – Nome." sem verbo. Verbos sorteados de listas por um hash do parágrafo
+  (sempre o mesmo para o mesmo trecho); falas que já têm verbo não mudam.
+
+Novo plugin: crie `tts_md/plugins/<pacote>/__init__.py` com uma subclasse de
+`BlockPlugin` (`slug`, `description`, `handle(bloco) -> texto`; `prepare(md)` se precisar
+do livro inteiro) e registre-a em `registry()` de `tts_md/plugins/__init__.py`.
+
 ## Repetir o último (`--last`)
 
 `tts-md --last` toca de novo o que foi tocado por último, sem sintetizar nada. Cada
