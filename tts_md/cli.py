@@ -771,13 +771,16 @@ def main(
 
     book_sections: list[int] = []
     if epub_file is not None:
-        from tts_md.epub import EpubError, has_kfx_drm, read_book
+        from tts_md.epub import BOOK_DEFAULT_LANG, EpubError, has_kfx_drm, read_book
         from tts_md.audio.player import STATE_DIR
 
+        # Livro e' sempre pt-BR, a menos que --lang diga outra coisa: nao segue
+        # o default_lang do config nem o idioma declarado nos metadados do EPUB.
+        lang = lang or BOOK_DEFAULT_LANG
         try:
             if epub_file.suffix.lower() != ".epub" and not has_kfx_drm(epub_file):
                 click.echo(f"Converting {epub_file.name} with Calibre (cached after the first time)...")
-            book = read_book(epub_file, lang=lang or "pt-BR")
+            book = read_book(epub_file, lang=lang)
         except EpubError as exc:
             raise click.ClickException(str(exc)) from exc
         _echo_warnings(book.warnings)

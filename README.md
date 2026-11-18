@@ -120,6 +120,8 @@ tts-md --epub livro.epub --track 3 # retoma 3 blocos antes de onde parou
   (`<sup>`, `epub:type="noteref"`), imagens, quebras de página e o sumário de navegação
   ficam de fora. Uma cópia do Markdown fica em `~/.local/state/tts-md/epub/<livro>.md`
   para conferência. Implica `--play`.
+- Livros são sempre lidos em **pt-BR**, independente do `default_lang` do config e do
+  idioma declarado no EPUB. Para outro idioma, passe `--lang` (ex.: `--lang en-US`).
 - `--book` é sinônimo de `--epub` e aceita outros formatos: AZW3, MOBI, FB2 e KFX **sem
   DRM** passam antes pelo `ebook-convert` do Calibre e viram um EPUB em cache
   (`~/.local/state/tts-md/book-cache/`), convertido de novo só se o arquivo mudar. KFX

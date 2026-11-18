@@ -23,6 +23,8 @@ from pathlib import Path
 from urllib.parse import unquote
 
 CONTAINER_PATH = "META-INF/container.xml"
+# Idioma dos livros quando --lang nao e' passado (independe do config).
+BOOK_DEFAULT_LANG = "pt-BR"
 XHTML_TYPES = {"application/xhtml+xml", "text/html"}
 
 HEADINGS = {"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6}
@@ -339,7 +341,7 @@ def convert_to_epub(path: Path) -> Path:
     return target
 
 
-def read_book(path: Path, *, lang: str = "pt-BR") -> EpubBook:
+def read_book(path: Path, *, lang: str = BOOK_DEFAULT_LANG) -> EpubBook:
     """EPUB direto; qualquer outro formato passa antes pelo Calibre.
 
     Depois conserta palavras partidas por conversao ruim de PDF, se o livro

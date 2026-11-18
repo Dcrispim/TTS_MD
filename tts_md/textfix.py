@@ -29,6 +29,17 @@ MIN_CLEAR_RATIO = 0.001
 AMBIGUOUS_FIRST = {"com", "em", "tem", "sem", "nem", "bem", "quem", "cem", "sim"}
 AMBIGUOUS_SECOND = {"o", "a", "os", "as", "e", "é", "à", "ao", "aos", "às", "um", "uns"}
 
+# "com o" seguido disto nao pode ser "com o" de verdade ("com o um fantasma",
+# "com o se fosse"): e' "como". "que"/"de" ficam de fora ("com o que tinha").
+COMO_NEXT = {
+    "um", "uma", "uns", "umas", "o", "a", "os", "as", "se", "eu", "ele", "ela", "eles",
+    "elas", "você", "vocês", "nós", "me", "te", "lhe", "não", "sempre", "nunca", "já",
+    "também", "sua", "seu", "suas", "seus", "isso", "isto", "aquilo",
+}
+# Capitular solta no inicio do paragrafo ("S anta Helena"): junta a letra com o
+# resto, menos as letras que sao palavras sozinhas ("A ruiva", "O exilado").
+WORD_LETTERS = {"A", "E", "O", "É", "À", "Ó", "Ô", "Ê"}
+
 # Nucleo pode ter hifen ("diga-m", "udá-lo"); pontuacao fica nas pontas.
 TOKEN_RE = re.compile(r"^([^\w]*)(\w+(?:-\w+)*)([^\w]*)$", re.UNICODE)
 
@@ -117,7 +128,29 @@ def _ambiguous(tokens: list[str], i: int, k: int) -> bool:
     if k != i + 1:
         return False
     first, second = _split(tokens[i]), _split(tokens[k])
+    if first[1].lower() == "com" and second[1].lower() == "o" and not second[2]:
+        after = _split(tokens[k + 1]) if k + 1 < len(tokens) else None
+        if after is not None and not after[0] and after[1].lower() in COMO_NEXT:
+            return False
     return first[1].lower() in AMBIGUOUS_FIRST and second[1].lower() in AMBIGUOUS_SECOND
+
+
+def _join_drop_cap(tokens: list[str]) -> bool:
+    """Junta a capitular solta do inicio do paragrafo. Devolve se juntou."""
+    if len(tokens) < 2:
+        return False
+    first, second = tokens[0], _split(tokens[1])
+    if (
+        len(first) == 1
+        and first.isupper()
+        and first not in WORD_LETTERS
+        and second is not None
+        and not second[0]
+        and second[1][:1].islower()
+    ):
+        tokens[0:2] = [first + tokens[1]]
+        return True
+    return False
 
 
 def repair_split_words(text: str, dictionary: Path | None) -> tuple[str, int]:
@@ -159,6 +192,8 @@ def repair_split_words(text: str, dictionary: Path | None) -> tuple[str, int]:
     fixed = 0
     out_lines: list[str] = []
     for tokens in tokenized:
+        if _join_drop_cap(tokens):
+            fixed += 1
         best: dict[int, int] = {}
         for i, k, joined in _chains(tokens):
             if (_is_word(joined, valid) and not _ambiguous(tokens, i, k)) or _name_split(tokens, i, k, valid):
