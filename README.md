@@ -149,6 +149,30 @@ Markdown, só os títulos. Ctrl+C (exit 130), fechar o terminal (SIGHUP, 129) e 
 (SIGTERM, 143) também param o player e deixam o progresso salvo. A leitura é sempre
 local (ignora `--host`) e não combina com `--stream`, `--video`, `--output` ou `--temp`.
 
+### Plugins por tipo de livro (`--plugins`)
+
+Ajustes que só fazem sentido para um tipo de livro, obra ou autor ficam isolados em
+`tts_md/plugins/<pacote>/` e não entram na base geral. **Nada roda sozinho**: os plugins
+são pedidos explicitamente na leitura e aplicados nessa ordem a cada bloco (parágrafo),
+que volta com o texto final. Uma linha continua uma linha, então seções e `--track` não
+se deslocam.
+
+```bash
+tts-md --book livro.azw3 --track --plugins novel-dialogue   # vírgula ou repetir a flag p/ vários
+tts-md --list-plugins                                       # slug<TAB>descrição (o biblio usa)
+```
+
+- **`novel-dialogue`** (light novels traduzidas por fãs, ex.: *Tensei Shitara Slime*): o
+  nome entre parênteses no fim da fala vira verbo + nome, para não ficar "solto" em voz
+  alta — `「…responder?」 (Mensageiro)` → "…responder? perguntou Mensageiro",
+  `(…pensamento…) (Gazelle)` → "pensou Gazelle", `(???)` → "alguém". Também
+  "– fala – Nome." sem verbo. Verbos sorteados de listas por um hash do parágrafo
+  (sempre o mesmo para o mesmo trecho); falas que já têm verbo não mudam.
+
+Novo plugin: crie `tts_md/plugins/<pacote>/__init__.py` com uma subclasse de
+`BlockPlugin` (`slug`, `description`, `handle(bloco) -> texto`; `prepare(md)` se precisar
+do livro inteiro) e registre-a em `registry()` de `tts_md/plugins/__init__.py`.
+
 ## Repetir o último (`--last`)
 
 `tts-md --last` toca de novo o que foi tocado por último, sem sintetizar nada. Cada

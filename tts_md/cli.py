@@ -584,6 +584,22 @@ class _Command(click.Command):
     ),
 )
 @click.option(
+    "--plugins",
+    "plugin_values",
+    multiple=True,
+    metavar="SLUG,...",
+    help=(
+        "Block plugins (tts_md/plugins/) applied, in this order, to every paragraph "
+        "of an --epub/--book: --plugins novel-dialogue. Comma-separated and "
+        "repeatable. Nothing runs unless listed here. See --list-plugins."
+    ),
+)
+@click.option(
+    "--list-plugins",
+    is_flag=True,
+    help="Print the available plugins (slug<TAB>description, one per line) and exit.",
+)
+@click.option(
     "--start",
     "start_over",
     is_flag=True,
@@ -618,6 +634,8 @@ def main(
     images_dir: Path | None,
     epub_file: Path | None,
     track: int | None,
+    plugin_values: tuple[str, ...],
+    list_plugins: bool,
     start_over: bool,
 ) -> None:
     """Convert Markdown to speech using modular parsers and offline TTS."""
@@ -643,6 +661,13 @@ def main(
             replay(last_files)
         except RuntimeError as exc:
             raise click.ClickException(str(exc)) from exc
+        return
+
+    if list_plugins:
+        from tts_md import plugins
+
+        for slug, cls in sorted(plugins.registry().items()):
+            click.echo(f"{slug}\t{cls.description}")
         return
 
     if replace and not add_terms:
@@ -732,6 +757,17 @@ def main(
     if speed <= 0:
         raise click.ClickException("--speed must be greater than 0.")
 
+    plugin_slugs: list[str] = []
+    if plugin_values:
+        if epub_file is None:
+            raise click.ClickException("--plugins only applies to --epub/--book.")
+        from tts_md import plugins
+
+        plugin_slugs = plugins.parse_slugs(plugin_values)
+        try:
+            plugins.load(plugin_slugs)  # falha cedo, antes de converter o livro
+        except ValueError as exc:
+            raise click.ClickException(str(exc)) from exc
     # Arquivo cujo progresso de leitura e' acompanhado (--track/--start/--epub).
     track_source = epub_file or input_file
     if (track is not None or start_over) and track_source is None:
@@ -787,6 +823,13 @@ def main(
         if book.repaired:
             click.echo(f"Fixed {book.repaired} words split by a bad PDF conversion (e.g. 'tom ei' -> 'tomei').")
         markdown = book.markdown
+        # Ajustes por tipo de livro: so os plugins pedidos em --plugins, nessa ordem.
+        if plugin_slugs:
+            from tts_md import plugins
+
+            markdown, changed = plugins.apply(plugins.load(plugin_slugs), markdown)
+            for slug, count in changed.items():
+                click.echo(f"Plugin '{slug}': {count} blocks adjusted.")
         book_sections = book.section_lines
         md_copy = STATE_DIR / "epub" / f"{slugify(epub_file.stem) or 'book'}.md"
         try:
