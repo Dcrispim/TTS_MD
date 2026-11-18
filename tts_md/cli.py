@@ -317,7 +317,30 @@ def _run_video(
     return warnings
 
 
-@click.command()
+class _Command(click.Command):
+    """`--track` tem valor opcional: sem o ajuste, `--track notas.md` tentaria
+    ler "notas.md" como o N. Se o que vem depois nao e' numero, vira --track=0."""
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        fixed = list(args)
+        for i, arg in enumerate(fixed):
+            if arg == "--":
+                break
+            if arg == "--track":
+                nxt = fixed[i + 1] if i + 1 < len(fixed) else None
+                if nxt is not None and nxt.lstrip("-").isdigit():
+                    if nxt.startswith("-"):
+                        # O click leria "-1" como outra opcao ("No such option").
+                        raise click.UsageError(
+                            f"--track N must be 0 or more, got {nxt}.", ctx=ctx
+                        )
+                    fixed[i : i + 2] = [f"--track={nxt}"]
+                else:
+                    fixed[i] = "--track=0"
+        return super().parse_args(ctx, fixed)
+
+
+@click.command(cls=_Command)
 @click.argument(
     "input_file",
     required=False,
@@ -531,6 +554,41 @@ def _run_video(
         "directory with --text)."
     ),
 )
+@click.option(
+    "--epub",
+    "--book",
+    "epub_file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "Read a book aloud: it is converted to Markdown (one line per "
+        "paragraph) and played block by block, with keyboard controls. "
+        "EPUB is read directly; AZW3, MOBI, DRM-free KFX, FB2 and other "
+        "formats go through Calibre's ebook-convert first (cached). "
+        "Implies --play. Combine with --track to read it over several days."
+    ),
+)
+@click.option(
+    "--track",
+    type=click.IntRange(min=0),
+    is_flag=False,
+    flag_value=0,
+    default=None,
+    metavar="[N]",
+    help=(
+        "Save the reading position of the file (or --epub) at every new "
+        "block, so the next run resumes where it stopped. With N, resume N "
+        "blocks before the saved position (--track 3) to recall the context. "
+        "Implies --play. A file that already has saved progress always "
+        "resumes from it."
+    ),
+)
+@click.option(
+    "--start",
+    "start_over",
+    is_flag=True,
+    help="Ignore the saved progress and read from the beginning (tracking restarts too).",
+)
 def main(
     input_file: Path | None,
     inline_text: str | None,
@@ -558,6 +616,9 @@ def main(
     persona_id: str | None,
     video: bool,
     images_dir: Path | None,
+    epub_file: Path | None,
+    track: int | None,
+    start_over: bool,
 ) -> None:
     """Convert Markdown to speech using modular parsers and offline TTS."""
     if replay_last:
@@ -658,22 +719,86 @@ def main(
         run_server(config, opts, host or "0.0.0.0", port)
         return
 
-    if input_file is not None and inline_text is not None:
+    if sum(x is not None for x in (input_file, inline_text, epub_file)) > 1:
         raise click.ClickException(
-            "Pass either a Markdown file or --text, not both."
+            "Pass only one of: a Markdown file, --text or --epub."
         )
-    if input_file is None and inline_text is None:
+    if input_file is None and inline_text is None and epub_file is None:
         raise click.ClickException(
-            'Nothing to read: pass a Markdown file or --text "...".'
+            'Nothing to read: pass a Markdown file, --text "..." or --epub BOOK.epub.'
         )
     if check and not host:
         raise click.ClickException("--check only applies to --host.")
     if speed <= 0:
         raise click.ClickException("--speed must be greater than 0.")
 
-    markdown = (
-        inline_text if inline_text is not None else input_file.read_text(encoding="utf-8")
-    )
+    # Arquivo cujo progresso de leitura e' acompanhado (--track/--start/--epub).
+    track_source = epub_file or input_file
+    if (track is not None or start_over) and track_source is None:
+        raise click.ClickException(
+            "--track/--start need a file (Markdown or --epub) to keep the progress of."
+        )
+    # Ler um arquivo sempre consulta o progresso salvo: se existir, a leitura
+    # continua de onde parou (a menos que seja so gerar audio, sem --play).
+    reading = epub_file is not None or track is not None or start_over
+    if not reading and play and input_file is not None and not debug_parser:
+        from tts_md.reader import load_progress
+
+        reading = load_progress(input_file) is not None
+    if reading and not debug_parser:
+        clashing = [
+            flag
+            for flag, given in (
+                ("--stream", stream),
+                ("--video", video),
+                ("--output", output is not None),
+                ("--temp", temp),
+            )
+            if given
+        ]
+        if clashing:
+            raise click.ClickException(
+                f"{', '.join(clashing)} can't be combined with --epub/--track/--start: "
+                "a tracked reading plays block by block and discards the audio."
+            )
+        if host:
+            click.echo(
+                f"warning: tracked reading is always local; ignoring --host {host}",
+                err=True,
+            )
+            host = None
+        play = True
+
+    book_sections: list[int] = []
+    if epub_file is not None:
+        from tts_md.epub import EpubError, has_kfx_drm, read_book
+        from tts_md.audio.player import STATE_DIR
+
+        try:
+            if epub_file.suffix.lower() != ".epub" and not has_kfx_drm(epub_file):
+                click.echo(f"Converting {epub_file.name} with Calibre (cached after the first time)...")
+            book = read_book(epub_file, lang=lang or "pt-BR")
+        except EpubError as exc:
+            raise click.ClickException(str(exc)) from exc
+        _echo_warnings(book.warnings)
+        if book.repaired:
+            click.echo(f"Fixed {book.repaired} words split by a bad PDF conversion (e.g. 'tom ei' -> 'tomei').")
+        markdown = book.markdown
+        book_sections = book.section_lines
+        md_copy = STATE_DIR / "epub" / f"{slugify(epub_file.stem) or 'book'}.md"
+        try:
+            md_copy.parent.mkdir(parents=True, exist_ok=True)
+            md_copy.write_text(markdown, encoding="utf-8")
+        except OSError:
+            md_copy = None
+        click.echo(
+            f"Book: {book.title} ({book.chapters} sections, {book.paragraphs} paragraphs)"
+            + (f" -> {md_copy}" if md_copy else "")
+        )
+    else:
+        markdown = (
+            inline_text if inline_text is not None else input_file.read_text(encoding="utf-8")
+        )
 
     # Explicito (--persona) vence; senao olha o .tts-md.persona do diretorio
     # atual para o host:port de destino. Se cair no fallback local (--check),
@@ -791,6 +916,32 @@ def main(
 
     if not blocks:
         raise click.ClickException("No speakable content found after parsing.")
+
+    if reading:
+        from tts_md.reader import heading_lines, read_aloud
+
+        if find_player() is None:
+            raise click.ClickException(missing_player_message())
+        work_tmp = work_dir(track_source.name)
+        try:
+            code = read_aloud(
+                engine,
+                blocks,
+                source=track_source,
+                track=track is not None,
+                rewind=track or 0,
+                start_over=start_over,
+                speed=speed,
+                keep_temp=keep_temp,
+                work=work_tmp,
+                sections=heading_lines(engine.last_cues.markdown)
+                | set(book_sections),
+            )
+        except RuntimeError as exc:
+            raise click.ClickException(str(exc)) from exc
+        if code:
+            raise SystemExit(code)
+        return
 
     video_images = None
     if video:

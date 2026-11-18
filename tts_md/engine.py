@@ -236,6 +236,24 @@ class TTSEngine:
 
         return parts
 
+    def synthesize_line(
+        self,
+        group: list[SpeechBlock],
+        work_tmp: Path,
+        index: int,
+        *,
+        speed: float = 1.0,
+        width: int = 3,
+    ) -> Path:
+        """Sintetiza os blocos de uma linha do Markdown num unico WAV em work_tmp."""
+        parts = self._synthesize_group(group, work_tmp, index, speed=speed)
+        staged = work_tmp / f"line_{index:0{width}d}.wav"
+        if len(parts) == 1:
+            normalize_sample_rate(parts[0], staged, TARGET_SAMPLE_RATE)
+        else:
+            concat_audio(parts, staged)
+        return staged
+
     def run_stream(
         self,
         text: str,
@@ -274,12 +292,7 @@ class TTSEngine:
                 title = " ".join(block.text for block in group)
                 final_path = out_dir / f"{track_name(index, title, width=width)}.wav"
 
-                parts = self._synthesize_group(group, work_tmp, index, speed=speed)
-                staged = work_tmp / f"line_{index:0{width}d}.wav"
-                if len(parts) == 1:
-                    normalize_sample_rate(parts[0], staged, TARGET_SAMPLE_RATE)
-                else:
-                    concat_audio(parts, staged)
+                staged = self.synthesize_line(group, work_tmp, index, speed=speed, width=width)
 
                 # move e' rename atomico no mesmo filesystem: um player que
                 # esteja acompanhando a pasta nunca abre um arquivo pela metade.
